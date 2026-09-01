@@ -1,7 +1,8 @@
-# GreenFork Partner Console
+# Foodie Restaurant Application
 
-Frontend-only restaurant partner panel using realistic in-memory data. Run with `yarn start`.
+This repository contains the Restaurant Frontend Mobile Application for the Foodie platform.
 
-Demo login accepts any values and stores a local session. Overview, order queue, menu stock management, analytics, offers, payouts, settings, responsive navigation, and a simulated live-order event are included.
+## Architecture
+- `frontend/`: The restaurant mobile application (React Native/Expo).
 
-`src/services/index.js` is the backend swap point. Replace each mock adapter while preserving its domain contract; no component needs to import mock data directly.
+The application connects to the single shared Foodie backend hosted at `https://api.foodie.kwiko.org`.
