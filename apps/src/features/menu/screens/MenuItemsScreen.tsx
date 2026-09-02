@@ -26,6 +26,7 @@ import {
 } from 'foodie-shared-rn';
 
 import {
+  useCreateCategoryMutation,
   useCreateMenuItemMutation,
   useDeleteMenuItemMutation,
   useGetMenuQuery,
@@ -218,6 +219,7 @@ export function MenuItemsScreen({ navigation }: Props) {
     refetchOnFocus: true,
   });
 
+  const [createCategory] = useCreateCategoryMutation();
   const [createItem, createItemState] = useCreateMenuItemMutation();
   const [updateItem, updateItemState] = useUpdateMenuItemMutation();
   const [deleteItem] = useDeleteMenuItemMutation();
@@ -228,10 +230,8 @@ export function MenuItemsScreen({ navigation }: Props) {
     MOCK_CONFIG.ENABLE_MOCK_FALLBACK &&
     (!isConnected || (restaurantId && restaurantId.startsWith('mock-resto-')));
 
-  // Synchronize initial menu items from API or Mock into single source of truth without resetting selectedCategoryId
+  // Synchronize menu items from API or Mock into single source of truth
   useEffect(() => {
-    if (isInitialized && menuItems.length > 0) return;
-
     if (menuQuery.data?.categories && menuQuery.data.categories.length > 0) {
       const itemsList: NormalizedMenuItem[] = [];
       for (const cat of menuQuery.data.categories) {
@@ -246,7 +246,7 @@ export function MenuItemsScreen({ navigation }: Props) {
       }
     }
 
-    if (isUsingMock || (!menuQuery.isLoading && menuItems.length === 0)) {
+    if (!isInitialized && (isUsingMock || (!menuQuery.isLoading && menuItems.length === 0))) {
       const mockItems: NormalizedMenuItem[] = [];
       for (const cat of MOCK_CATEGORIES) {
         for (const item of cat.items) {
@@ -256,7 +256,7 @@ export function MenuItemsScreen({ navigation }: Props) {
       setMenuItems(mockItems);
       setIsInitialized(true);
     }
-  }, [menuQuery.data, isUsingMock, menuQuery.isLoading, isInitialized, menuItems.length]);
+  }, [menuQuery.data, isUsingMock, menuQuery.isLoading, isInitialized]);
 
   useEffect(() => {
     trackAnalyticsEvent('restaurant_menu_management_viewed');
@@ -434,9 +434,14 @@ export function MenuItemsScreen({ navigation }: Props) {
 
     const targetCatObj = DEFAULT_CATEGORIES.find((c) => c.id === formCategoryId);
     const catName = formCategoryName || (targetCatObj ? targetCatObj.name : 'Main Course');
-    const catId = formCategoryId.includes('-')
-      ? formCategoryId
-      : 'c3333333-3333-4333-8333-333333333333';
+    let catId = formCategoryId.includes('-') ? formCategoryId : '';
+    if (!catId) {
+      if (menuQuery.data?.categories && menuQuery.data.categories.length > 0) {
+        catId = menuQuery.data.categories[0].categoryId;
+      } else {
+        catId = '170052ea-c439-44d5-866d-bcbf6ccebe98';
+      }
+    }
 
     if (editingItem) {
       // EDIT ITEM
@@ -481,6 +486,7 @@ export function MenuItemsScreen({ navigation }: Props) {
               fileName: 'dish.jpg',
             }).unwrap();
           }
+          void menuQuery.refetch();
         } catch {
           // Gracefully fallback
         }
@@ -530,6 +536,7 @@ export function MenuItemsScreen({ navigation }: Props) {
               fileName: 'dish.jpg',
             }).unwrap();
           }
+          void menuQuery.refetch();
         } catch (error: any) {
           setMenuItems((prev) => prev.filter(i => i.menuItemId !== newItemId));
           setToast({ message: error?.data?.message || error?.message || 'Failed to save to server.', variant: 'error' });
