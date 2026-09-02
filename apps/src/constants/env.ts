@@ -26,8 +26,13 @@ if (Platform.OS === 'web') {
   }
 }
 
+let resolvedApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? extra.apiBaseUrl ?? 'https://api.foodie.kwiko.org';
+if (Platform.OS === 'web' && __DEV__ && typeof window !== 'undefined' && window.location?.origin) {
+  resolvedApiBaseUrl = window.location.origin;
+}
+
 export const ENV = {
-  apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL ?? extra.apiBaseUrl ?? 'https://api.foodie.kwiko.org',
+  apiBaseUrl: resolvedApiBaseUrl,
   wsUrl: process.env.EXPO_PUBLIC_WS_URL ?? extra.wsUrl ?? 'wss://api.foodie.kwiko.org/ws',
   appName: 'foodie-restaurant',
   appVersion: Constants.expoConfig?.version ?? '0.1.0',
