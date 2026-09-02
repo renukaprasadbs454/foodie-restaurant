@@ -194,7 +194,7 @@ export function OrderCard({
           paddingTop: tokens.spacing.xs,
         }}
       >
-        {status === 'CONFIRMED' ? (
+        {['CONFIRMED', 'PLACED', 'PENDING'].includes(status) ? (
           <>
             <Button
               label="Reject"
@@ -211,20 +211,12 @@ export function OrderCard({
               onPress={() => onTransitionStatus(order.orderId, 'ACCEPTED')}
             />
           </>
-        ) : status === 'ACCEPTED' ? (
+        ) : ['ACCEPTED', 'PREPARING'].includes(status) ? (
           <Button
-            label="Start Preparing 🍳"
-            accessibilityLabel={`Start preparing order ${order.orderNumber}`}
+            label="Food is Ready 🍱"
+            accessibilityLabel={`Mark food ready for pickup for order ${order.orderNumber}`}
             loading={isTransitioning}
-            style={{ backgroundColor: '#2563EB', height: 38 }}
-            onPress={() => onTransitionStatus(order.orderId, 'PREPARING')}
-          />
-        ) : status === 'PREPARING' ? (
-          <Button
-            label="Mark Ready for Pickup 📦"
-            accessibilityLabel={`Mark order ${order.orderNumber} ready for pickup`}
-            loading={isTransitioning}
-            style={{ backgroundColor: BRAND_PRIMARY, height: 38 }}
+            style={{ backgroundColor: '#16A34A', paddingHorizontal: 16, height: 40, borderRadius: 10 }}
             onPress={() => onTransitionStatus(order.orderId, 'READY_FOR_PICKUP')}
           />
         ) : null}

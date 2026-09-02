@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Image,
   Pressable,
@@ -23,18 +23,20 @@ import {
   useGetRestaurantProfileQuery,
   useGetRestaurantQuery,
 } from '../../../api/endpoints/restaurantsApi';
-import { useGetRestaurantOrdersQuery } from '../../../api/endpoints/ordersApi';
+import { useGetRestaurantOrdersQuery, useTransitionOrderStatusMutation } from '../../../api/endpoints/ordersApi';
 import { useAppDispatch, useAppSelector } from '../../../store/hooks';
 import {
   selectRestaurantId,
   setRestaurantCreated,
 } from '../../onboarding/restaurantOnboardingSlice';
 import { useRestaurantOrdersSubscription } from '../hooks/useRestaurantOrdersSubscription';
-import { formatMoney } from '../types';
+import { formatMoney, validateRejectReason } from '../types';
 import type { OrdersStackParamList } from '../../../navigation/types';
 import { DemoModeIndicator } from '../../../components/DemoModeIndicator';
 import { MOCK_CONFIG } from '../../../config/mockConfig';
 import { getMockDashboardSummary, getMockRestaurantProfile } from '../../../mock';
+import { IncomingOrderAlertModal } from '../components/IncomingOrderAlertModal';
+import { RejectOrderModal } from '../components/RejectOrderModal';
 
 type Props = NativeStackScreenProps<OrdersStackParamList, 'Dashboard'>;
 
@@ -57,8 +59,13 @@ export function DashboardScreen({ navigation }: Props) {
     { page: 0, size: 20, sort: 'placedAt' },
     {
       refetchOnFocus: true,
+      pollingInterval: 10_000, // Poll every 10 seconds for real-time customer order updates
     },
   );
+
+  const [transitionStatus] = useTransitionOrderStatusMutation();
+  const [dismissedAlertOrderIds, setDismissedAlertOrderIds] = useState<string[]>([]);
+  const [rejectingOrder, setRejectingOrder] = useState<{ orderId: string; orderNumber: string } | null>(null);
 
   useEffect(() => {
     if (profileQuery.data?.restaurantId && !storedRestaurantId) {
@@ -601,6 +608,54 @@ export function DashboardScreen({ navigation }: Props) {
           )}
         </Card>
       </ScrollView>
+
+      {/* INCOMING ORDER ALERT MODAL WITH SOUND */}
+      {(() => {
+        const incomingOrderNeedingAction = orders.find(
+          (o) => o.status === 'CONFIRMED' && !dismissedAlertOrderIds.includes(o.orderId)
+        ) ?? null;
+
+        return (
+          <>
+            <IncomingOrderAlertModal
+              order={incomingOrderNeedingAction}
+              visible={Boolean(incomingOrderNeedingAction)}
+              onAccept={async (orderId) => {
+                setDismissedAlertOrderIds((prev) => [...prev, orderId]);
+                try {
+                  await transitionStatus({ orderId, targetStatus: 'ACCEPTED' }).unwrap();
+                  void activeQuery.refetch();
+                } catch (e) { }
+              }}
+              onReject={(orderId) => {
+                const target = orders.find((o) => o.orderId === orderId);
+                setDismissedAlertOrderIds((prev) => [...prev, orderId]);
+                if (target) {
+                  setRejectingOrder({ orderId: target.orderId, orderNumber: target.orderNumber });
+                }
+              }}
+            />
+
+            <RejectOrderModal
+              visible={Boolean(rejectingOrder)}
+              orderNumber={rejectingOrder?.orderNumber}
+              loading={false}
+              onConfirm={(reason) => {
+                if (rejectingOrder) {
+                  void transitionStatus({
+                    orderId: rejectingOrder.orderId,
+                    targetStatus: 'REJECTED',
+                    reason,
+                  }).unwrap();
+                  setRejectingOrder(null);
+                  void activeQuery.refetch();
+                }
+              }}
+              onCancel={() => setRejectingOrder(null)}
+            />
+          </>
+        );
+      })()}
     </View>
   );
 }

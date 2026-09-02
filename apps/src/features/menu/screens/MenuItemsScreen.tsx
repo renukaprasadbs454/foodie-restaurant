@@ -35,6 +35,7 @@ import {
 } from '../../../api/endpoints/menuApi';
 import { useGetRestaurantProfileQuery } from '../../../api/endpoints/restaurantsApi';
 import { useAppDispatch, useAppSelector } from '../../../store/hooks';
+import { ENV } from '../../../constants/env';
 import {
   selectRestaurantId,
   setRestaurantCreated,
@@ -140,6 +141,13 @@ function isItemInCategory(item: NormalizedMenuItem, categoryId: string): boolean
 
 export function MenuItemsScreen({ navigation }: Props) {
   const { tokens } = useTheme();
+
+  const resolveImageUrl = (uri?: string | null) => {
+    if (!uri) return null;
+    if (uri.startsWith('http')) return uri;
+    if (uri.startsWith('/api')) return `${ENV.apiBaseUrl}${uri}`;
+    return uri;
+  };
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
   const { isConnected } = useConnectivity();
@@ -218,7 +226,7 @@ export function MenuItemsScreen({ navigation }: Props) {
 
   const isUsingMock =
     MOCK_CONFIG.ENABLE_MOCK_FALLBACK &&
-    (!isConnected || menuQuery.isError || !menuQuery.data?.categories?.length);
+    (!isConnected || (restaurantId && restaurantId.startsWith('mock-resto-')));
 
   // Synchronize initial menu items from API or Mock into single source of truth without resetting selectedCategoryId
   useEffect(() => {
@@ -346,9 +354,12 @@ export function MenuItemsScreen({ navigation }: Props) {
     setFormDescription('');
     setFormPrice('');
     setFormFoodType('VEG');
-    setFormCategoryId(selectedCategoryId !== 'all' ? selectedCategoryId : 'main_course');
+    const firstRealCategory = menuQuery.data?.categories?.[0];
+    setFormCategoryId(
+      firstRealCategory ? firstRealCategory.categoryId : 'main_course'
+    );
     setFormCategoryName(
-      DEFAULT_CATEGORIES.find((c) => c.id === selectedCategoryId)?.name ?? 'Main Course',
+      firstRealCategory ? firstRealCategory.name || 'Category' : 'Main Course'
     );
     setFormPrepTime('15 min');
     setFormIsAvailable(true);
@@ -422,11 +433,9 @@ export function MenuItemsScreen({ navigation }: Props) {
     setFormError('');
 
     const targetCatObj = DEFAULT_CATEGORIES.find((c) => c.id === formCategoryId);
-    const catName = targetCatObj ? targetCatObj.name : formCategoryName || 'Main Course';
+    const catName = formCategoryName || (targetCatObj ? targetCatObj.name : 'Main Course');
     const catId = formCategoryId.includes('-')
       ? formCategoryId
-      : targetCatObj
-      ? targetCatObj.id
       : 'c3333333-3333-4333-8333-333333333333';
 
     if (editingItem) {
@@ -521,8 +530,9 @@ export function MenuItemsScreen({ navigation }: Props) {
               fileName: 'dish.jpg',
             }).unwrap();
           }
-        } catch {
-          // Gracefully fallback
+        } catch (error: any) {
+          setMenuItems((prev) => prev.filter(i => i.menuItemId !== newItemId));
+          setToast({ message: error?.data?.message || error?.message || 'Failed to save to server.', variant: 'error' });
         }
       }
     }
@@ -787,9 +797,8 @@ export function MenuItemsScreen({ navigation }: Props) {
             title={
               selectedCategoryId === 'all'
                 ? 'No menu items yet'
-                : `No ${
-                    DEFAULT_CATEGORIES.find((c) => c.id === selectedCategoryId)?.name ?? ''
-                  } items yet`
+                : `No ${DEFAULT_CATEGORIES.find((c) => c.id === selectedCategoryId)?.name ?? ''
+                } items yet`
             }
             description={
               selectedCategoryId === 'all'
@@ -1100,7 +1109,7 @@ export function MenuItemsScreen({ navigation }: Props) {
               <View style={{ gap: tokens.spacing.xs }}>
                 <Text variant="label">Category *</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                  {DEFAULT_CATEGORIES.filter((c) => c.id !== 'all').map((cat) => {
+                  {(menuQuery.data?.categories?.length ? menuQuery.data.categories.map(c => ({ id: c.categoryId, name: c.name || c.categoryName, icon: '🍽️' })) : DEFAULT_CATEGORIES.filter((c) => c.id !== 'all')).map((cat) => {
                     const isSelected = formCategoryId === cat.id;
                     return (
                       <Pressable

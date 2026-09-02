@@ -28,6 +28,7 @@ import { toUnwrappedApiError } from '../../auth/apiError';
 import { OrderCard } from '../components/OrderCard';
 import { OrderQueueSkeleton } from '../components/OrderQueueSkeleton';
 import { RejectOrderModal } from '../components/RejectOrderModal';
+import { IncomingOrderAlertModal } from '../components/IncomingOrderAlertModal';
 import { EmptyOrdersState } from '../components/EmptyOrdersState';
 import { useRestaurantOrdersSubscription } from '../hooks/useRestaurantOrdersSubscription';
 import type {
@@ -77,6 +78,8 @@ export function IncomingOrdersScreen({ navigation }: Props) {
     orderNumber: string;
   } | null>(null);
 
+  const [dismissedAlertOrderIds, setDismissedAlertOrderIds] = useState<string[]>([]);
+
   // Local state for demo mode transitions
   const [localOrders, setLocalOrders] = useState<ExtendedOrderDetail[]>(MOCK_ORDERS);
 
@@ -89,7 +92,7 @@ export function IncomingOrdersScreen({ navigation }: Props) {
     { page: 0, size: 100, sort: 'placedAt' },
     {
       refetchOnFocus: true,
-      pollingInterval: wsActive ? 0 : 45_000,
+      pollingInterval: 10_000,
     },
   );
 
@@ -496,6 +499,31 @@ export function IncomingOrdersScreen({ navigation }: Props) {
           </View>
         )}
       </ScrollView>
+
+      {/* INCOMING ORDER ALERT MODAL WITH SOUND */}
+      {(() => {
+        const incomingOrderNeedingAction = allOrders.find(
+          (o) => o.status === 'CONFIRMED' && !dismissedAlertOrderIds.includes(o.orderId)
+        ) ?? null;
+
+        return (
+          <IncomingOrderAlertModal
+            order={incomingOrderNeedingAction}
+            visible={Boolean(incomingOrderNeedingAction)}
+            onAccept={(orderId) => {
+              setDismissedAlertOrderIds((prev) => [...prev, orderId]);
+              void handleTransition(orderId, 'ACCEPTED');
+            }}
+            onReject={(orderId) => {
+              const target = allOrders.find((o) => o.orderId === orderId);
+              setDismissedAlertOrderIds((prev) => [...prev, orderId]);
+              if (target) {
+                setRejectingOrder({ orderId: target.orderId, orderNumber: target.orderNumber });
+              }
+            }}
+          />
+        );
+      })()}
 
       {/* REJECT ORDER MODAL */}
       <RejectOrderModal

@@ -143,26 +143,25 @@ export const restaurantsApi = baseApi.injectEndpoints({
         uri: string;
         mimeType: string;
         fileName: string;
-        fileObj?: any;
       }
     >({
-      query: ({ imageType, uri, mimeType, fileName, fileObj }) => {
-        const formData = new FormData();
-        formData.append('imageType', imageType);
-        if (fileObj) {
-          formData.append('file', fileObj);
-        } else {
-          formData.append('file', {
-            uri,
-            type: mimeType,
-            name: fileName,
-          } as unknown as Blob);
+      async queryFn(arg, _queryApi, _extraOptions, fetchWithBQ) {
+        try {
+          const response = await fetch(arg.uri);
+          const blob = await response.blob();
+          const formData = new FormData();
+          formData.append('imageType', arg.imageType);
+          formData.append('file', blob, arg.fileName);
+          const result = await fetchWithBQ({
+            url: '/api/v1/restaurants/me/images',
+            method: 'POST',
+            body: formData,
+          });
+          if (result.error) return { error: result.error };
+          return { data: result.data as any };
+        } catch (e: any) {
+          return { error: { status: 'FETCH_ERROR', error: e.message } as any };
         }
-        return {
-          url: '/api/v1/restaurants/me/images',
-          method: 'POST',
-          body: formData,
-        };
       },
       invalidatesTags: [{ type: 'Restaurant', id: 'LIST' }],
     }),

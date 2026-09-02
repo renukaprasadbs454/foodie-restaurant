@@ -27,8 +27,8 @@ import {
   useGetRestaurantProfileQuery,
   useGetRestaurantQuery,
   useUpdateRestaurantProfileMutation,
+  useUploadRestaurantImagesMutation,
 } from '../../../api/endpoints/restaurantsApi';
-import { useUploadProfileImageMutation } from '../../../api/endpoints/usersApi';
 import { useAppDispatch, useAppSelector } from '../../../store/hooks';
 import {
   selectRestaurantId,
@@ -45,6 +45,7 @@ import type { ProfileStackParamList } from '../../../navigation/types';
 import { DemoModeIndicator } from '../../../components/DemoModeIndicator';
 import { MOCK_CONFIG } from '../../../config/mockConfig';
 import { getMockRestaurantProfile, type MockRestaurantProfile } from '../../../mock';
+import { ENV } from '../../../constants/env';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'RestaurantProfile'>;
 
@@ -107,7 +108,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
   });
 
   const [updateProfile, updateState] = useUpdateRestaurantProfileMutation();
-  const [uploadImage] = useUploadProfileImageMutation();
+  const [uploadImage] = useUploadRestaurantImagesMutation();
 
   const apiProfile = query.data;
   const isUsingMock =
@@ -226,6 +227,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
     const mimeType = asset.mimeType ?? 'image/jpeg';
     try {
       await uploadImage({
+        imageType: 'LOGO',
         uri: asset.uri,
         mimeType,
         fileName: asset.fileName ?? 'profile.jpg',
@@ -267,7 +269,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
             <Card style={{ padding: 0, overflow: 'hidden', borderRadius: 16 }}>
               <View style={{ position: 'relative', height: 160 }}>
                 <Image
-                  source={{ uri: profileData?.coverImageUrl ?? COVER_IMAGE_URL }}
+                  source={{ uri: profileData?.coverImageUrl ? (profileData.coverImageUrl.startsWith('/api') ? `${ENV.apiBaseUrl}${profileData.coverImageUrl}` : profileData.coverImageUrl) : COVER_IMAGE_URL }}
                   style={{ width: '100%', height: '100%' }}
                   resizeMode="cover"
                 />
@@ -293,7 +295,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
               >
                 <View style={{ position: 'relative' }}>
                   <Avatar
-                    uri={avatarUri}
+                    uri={avatarUri ? (avatarUri.startsWith('/api') ? `${ENV.apiBaseUrl}${avatarUri}` : avatarUri) : null}
                     initials={(name || 'R').slice(0, 2).toUpperCase()}
                     size={88}
                     accessibilityLabel="Restaurant avatar"

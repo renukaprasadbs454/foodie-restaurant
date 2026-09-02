@@ -130,6 +130,25 @@ export function createBaseApi<TagTypes extends string = string>(
 
     if (result.error) {
       const fetchError = result.error as FetchBaseQueryError;
+      const envelope = parseEnvelopeFromUnknown(fetchError.data);
+      if (envelope && envelope.error) {
+        const code = envelope.error.code ?? 'INTERNAL_ERROR';
+        const apiError: EnvelopeAwareError = {
+          status: fetchError.status,
+          data: {
+            code,
+            message: envelope.error.message ?? 'Application error',
+            fields: envelope.error.fields ?? null,
+          },
+        };
+        logger.error('API application error', {
+          url: extractUrl(requestArgs),
+          status: String(fetchError.status),
+          code,
+        });
+        return { error: apiError, meta: result.meta };
+      }
+
       const errorMsg = ('error' in fetchError && typeof fetchError.error === 'string') ? fetchError.error : 'check your connection';
       const networkError: EnvelopeAwareError = {
         status: fetchError.status,

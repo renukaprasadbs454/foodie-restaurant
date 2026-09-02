@@ -126,18 +126,22 @@ export const menuApi = baseApi.injectEndpoints({
         fileName: string;
       }
     >({
-      query: ({ menuItemId, uri, mimeType, fileName }) => {
-        const formData = new FormData();
-        formData.append('file', {
-          uri,
-          type: mimeType,
-          name: fileName,
-        } as unknown as Blob);
-        return {
-          url: `/api/v1/menu/items/${menuItemId}/image`,
-          method: 'POST',
-          body: formData,
-        };
+      async queryFn(arg, _queryApi, _extraOptions, fetchWithBQ) {
+        try {
+          const response = await fetch(arg.uri);
+          const blob = await response.blob();
+          const formData = new FormData();
+          formData.append('file', blob, arg.fileName);
+          const result = await fetchWithBQ({
+            url: `/api/v1/menu/items/${arg.menuItemId}/image`,
+            method: 'POST',
+            body: formData,
+          });
+          if (result.error) return { error: result.error };
+          return { data: result.data as any };
+        } catch (e: any) {
+          return { error: { status: 'FETCH_ERROR', error: e.message } as any };
+        }
       },
       invalidatesTags: [{ type: 'Menu', id: 'LIST' }],
     }),
