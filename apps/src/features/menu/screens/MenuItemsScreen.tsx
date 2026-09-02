@@ -1109,7 +1109,7 @@ export function MenuItemsScreen({ navigation }: Props) {
               <View style={{ gap: tokens.spacing.xs }}>
                 <Text variant="label">Category *</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                  {(menuQuery.data?.categories?.length ? menuQuery.data.categories.map(c => ({ id: c.categoryId, name: c.name || c.categoryName, icon: '🍽️' })) : DEFAULT_CATEGORIES.filter((c) => c.id !== 'all')).map((cat) => {
+                  {(menuQuery.data?.categories?.length ? menuQuery.data.categories.map(c => ({ id: c.categoryId, name: c.name || (c as any).categoryName, icon: '🍽️' })) : DEFAULT_CATEGORIES.filter((c) => c.id !== 'all')).map((cat) => {
                     const isSelected = formCategoryId === cat.id;
                     return (
                       <Pressable

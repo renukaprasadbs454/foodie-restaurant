@@ -143,6 +143,7 @@ export const restaurantsApi = baseApi.injectEndpoints({
         uri: string;
         mimeType: string;
         fileName: string;
+        fileObj?: any;
       }
     >({
       async queryFn(arg, _queryApi, _extraOptions, fetchWithBQ) {

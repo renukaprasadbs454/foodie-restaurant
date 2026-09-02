@@ -28,8 +28,8 @@ export function IncomingOrderAlertModal({
     });
 
     const detail = detailQuery.data;
-    const items = detail?.items ?? order?.items ?? [];
-    const customerName = detail?.customerName ?? order?.customerName ?? 'Verified Customer';
+    const items: any[] = (detail as any)?.items ?? (order as any)?.items ?? [];
+    const customerName = (detail as any)?.customerName ?? (order as any)?.customerName ?? 'Verified Customer';
 
     // Continuous alert sound effect using Web Audio API (Pleasant 3-tone kitchen alert chime)
     useEffect(() => {
@@ -152,7 +152,7 @@ export function IncomingOrderAlertModal({
                             🍽️ Food Items Ordered ({items.length}):
                         </Text>
                         {items.length > 0 ? (
-                            items.map((item, idx) => (
+                            items.map((item: any, idx: number) => (
                                 <View
                                     key={`${item.menuItemId ?? idx}-${idx}`}
                                     style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
