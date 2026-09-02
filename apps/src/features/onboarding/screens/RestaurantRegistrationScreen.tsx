@@ -158,8 +158,23 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
     trackAnalyticsEvent('registration_submitted');
     try {
       const result = await register(validated.value).unwrap();
-      const restaurantId = result.restaurantId;
+      const restaurantId = result?.restaurantId || (result as any)?.data?.restaurantId;
       if (!restaurantId) {
+        // Fallback check if profile was already created
+        const profile = await dispatch(
+          restaurantsApi.endpoints.getRestaurantProfile.initiate(undefined, { forceRefetch: true })
+        ).unwrap();
+        if (profile?.restaurantId) {
+          dispatch(
+            setRestaurantCreated({
+              restaurantId: profile.restaurantId,
+              status: profile.status ?? 'PENDING',
+            }),
+          );
+          dispatch(clearIsNewUser());
+          navigation.replace('RestaurantDocuments');
+          return;
+        }
         setToast({
           message: 'Registration succeeded but restaurant id was missing.',
           variant: 'error',
@@ -177,12 +192,16 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
       navigation.replace('RestaurantDocuments');
     } catch (error) {
       const unwrapped = toUnwrappedApiError(error);
-      if (unwrapped.status === 409 || Number(unwrapped.status) === 409) {
+      if (
+        unwrapped.status === 409 ||
+        Number(unwrapped.status) === 409 ||
+        unwrapped.code === 'RESTAURANT_PROFILE_ALREADY_EXISTS'
+      ) {
         try {
           const profileResponse = await dispatch(
             restaurantsApi.endpoints.getRestaurantProfile.initiate(undefined, { forceRefetch: true })
           ).unwrap();
-          if (profileResponse.restaurantId) {
+          if (profileResponse?.restaurantId) {
             dispatch(
               setRestaurantCreated({
                 restaurantId: profileResponse.restaurantId,

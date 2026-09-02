@@ -49,11 +49,13 @@ export const restaurantsApi = baseApi.injectEndpoints({
             // commissionPct accepted but ignored server-side — omit from client
           },
         }),
+        transformResponse: (response: any) => response?.data || response,
         invalidatesTags: [{ type: 'Restaurant', id: 'LIST' }],
       },
     ),
     getRestaurantProfile: builder.query<RestaurantDetail, void>({
       query: () => '/api/v1/restaurants/me',
+      transformResponse: (response: any) => response?.data || response,
       providesTags: (result) =>
         result?.restaurantId
           ? [{ type: 'Restaurant', id: result.restaurantId }]
@@ -62,6 +64,7 @@ export const restaurantsApi = baseApi.injectEndpoints({
     }),
     getRestaurant: builder.query<RestaurantDetail, string>({
       query: (restaurantId) => `/api/v1/restaurants/${restaurantId}`,
+      transformResponse: (response: any) => response?.data || response,
       providesTags: (_result, _error, id) => [{ type: 'Restaurant', id }],
       keepUnusedDataFor: 120,
     }),
@@ -81,6 +84,7 @@ export const restaurantsApi = baseApi.injectEndpoints({
           // status / commissionPct not updatable — omit
         },
       }),
+      transformResponse: (response: any) => response?.data || response,
       invalidatesTags: (result) =>
         result?.restaurantId
           ? [
@@ -134,6 +138,7 @@ export const restaurantsApi = baseApi.injectEndpoints({
           body: formData,
         };
       },
+      transformResponse: (response: any) => response?.data || response,
       invalidatesTags: [{ type: 'Restaurant', id: 'LIST' }],
     }),
     uploadRestaurantImages: builder.mutation<
@@ -159,7 +164,7 @@ export const restaurantsApi = baseApi.injectEndpoints({
             body: formData,
           });
           if (result.error) return { error: result.error };
-          return { data: result.data as any };
+          return { data: (result.data as any)?.data || result.data };
         } catch (e: any) {
           return { error: { status: 'FETCH_ERROR', error: e.message } as any };
         }
@@ -171,6 +176,7 @@ export const restaurantsApi = baseApi.injectEndpoints({
         url: '/api/v1/restaurants/me/resubmit',
         method: 'POST',
       }),
+      transformResponse: (response: any) => response?.data || response,
       invalidatesTags: (result) =>
         result?.restaurantId
           ? [
