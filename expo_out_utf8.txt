@@ -1,0 +1,4 @@
+﻿env: load .env
+env: export EXPO_PUBLIC_API_BASE_URL EXPO_PUBLIC_WS_URL
+Starting project at C:\Users\hp\OneDrive\Desktop\foodie\foodie-restaurant-repo
+Using src/app as the root directory for Expo Router.
