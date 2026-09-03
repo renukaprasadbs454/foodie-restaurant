@@ -201,7 +201,12 @@ export function RestaurantImagesScreen({ navigation }: Props) {
             styles.secondaryButton,
             pressed && styles.secondaryButtonPressed,
           ]}
-          onPress={() => navigation.navigate('PendingApproval')}
+          onPress={() => {
+            setToast({ message: 'Restaurant onboarding application submitted successfully!', variant: 'success' });
+            setTimeout(() => {
+              navigation.navigate('PendingApproval');
+            }, 800);
+          }}
         >
           <Text style={styles.secondaryButtonText}>
             Submit & View Approval Status →
