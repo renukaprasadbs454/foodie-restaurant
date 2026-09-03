@@ -1,8 +1,20 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
+import { View, StyleSheet, Pressable, Platform } from 'react-native';
 import { Text } from 'foodie-shared-rn';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { formatCoordinates, isValidCoordinate } from '../location/locationTypes';
+
+const GOOGLE_MAPS_API_KEY = 'AIzaSyBef3prJr9YvHFDYczEJ-mzZfSlLd2vHbE';
+
+if (Platform.OS === 'web') {
+  // Fix for blank map on web using teovilla
+  try {
+    const { default: WebMap } = require('@teovilla/react-native-web-maps');
+    WebMap.init({ apiKey: GOOGLE_MAPS_API_KEY });
+  } catch (e) {
+    console.error('Failed to init react-native-web-maps', e);
+  }
+}
 
 interface Props {
   latitude: number;
@@ -12,7 +24,6 @@ interface Props {
 }
 
 const MARKER_COLOR = '#F59E0B'; // Amber Accent Color
-const GOOGLE_MAPS_API_KEY = 'AIzaSyBef3prJr9YvHFDYczEJ-mzZfSlLd2vHbE';
 
 export function RestaurantLocationMap({
   latitude,
