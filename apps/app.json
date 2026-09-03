@@ -60,8 +60,8 @@
       "expo-document-picker"
     ],
     "extra": {
-      "apiBaseUrl": "https://api.foodie.kwiko.org",
-      "wsUrl": "wss://api.foodie.kwiko.org/ws"
+      "apiBaseUrl": "http://10.33.98.186:8082",
+      "wsUrl": "ws://10.33.98.186:8082/ws"
     }
   }
 }
