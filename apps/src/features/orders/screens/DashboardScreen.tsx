@@ -37,6 +37,7 @@ import { MOCK_CONFIG } from '../../../config/mockConfig';
 import { getMockDashboardSummary, getMockRestaurantProfile } from '../../../mock';
 import { IncomingOrderAlertModal } from '../components/IncomingOrderAlertModal';
 import { RejectOrderModal } from '../components/RejectOrderModal';
+import { OrderCard } from '../components/OrderCard';
 
 type Props = NativeStackScreenProps<OrdersStackParamList, 'Dashboard'>;
 
@@ -558,104 +559,27 @@ export function DashboardScreen({ navigation }: Props) {
           ) : (
             <View style={{ gap: tokens.spacing.sm }}>
               {orders.slice(0, 5).map((order) => (
-                <Pressable
+                <OrderCard
                   key={order.orderId}
-                  onPress={() => {
+                  order={order}
+                  isTransitioning={false}
+                  onViewDetails={() => {
                     trackAnalyticsEvent('order_opened', { orderId: order.orderId });
                     navigation.navigate('RestaurantOrderDetails', {
                       orderId: order.orderId,
                     });
                   }}
-                  accessibilityRole="button"
-                  accessibilityLabel={`View details for order ${order.orderNumber}`}
-                  style={{
-                    padding: tokens.spacing.sm,
-                    borderRadius: tokens.radius.md,
-                    backgroundColor: tokens.color.surface,
-                    borderWidth: 1,
-                    borderColor: tokens.color.border,
+                  onTransitionStatus={async (orderId, targetStatus) => {
+                    try {
+                      await transitionStatus({ orderId, targetStatus }).unwrap();
+                    } catch (e) {
+                      // Error handled by mutation
+                    }
                   }}
-                >
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-
-                    <View style={{ gap: 2 }}>
-                      <Text variant="label" style={{ color: tokens.color.textPrimary, fontWeight: 'bold' }}>
-                        {order.orderNumber}
-                      </Text>
-                      <Text variant="caption" color={tokens.color.textSecondary}>
-                        {order.placedAt
-                          ? new Date(order.placedAt).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
-                          : 'Just now'}
-                      </Text>
-                    </View>
-
-                    <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                      <Text variant="label" style={{ color: BRAND_PRIMARY, fontWeight: 'bold' }}>
-                        {formatMoney(order.totalAmount)}
-                      </Text>
-                      <Badge
-                        label={order.status}
-                        tone={
-                          order.status === 'CONFIRMED'
-                            ? 'warning'
-                            : order.status === 'PREPARING'
-                              ? 'accent'
-                              : order.status === 'READY_FOR_PICKUP' || order.status === 'DELIVERED'
-                                ? 'success'
-                                : 'accent'
-                        }
-                        accessibilityLabel={`Order status ${order.status}`}
-                      />
-                    </View>
-                  </View>
-
-                  {/* LIVE ORDER ACTIONS DIRECTLY ON DASHBOARD */}
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-                    {order.status === 'CONFIRMED' && (
-                      <>
-                        <Button
-                          label="Accept"
-                          variant="primary"
-                          style={{ flex: 1 }}
-                          onPress={async (e) => { e.stopPropagation(); await transitionStatus({ orderId: order.orderId, targetStatus: 'ACCEPTED' }).unwrap(); }}
-                        />
-                        <Button
-                          label="Reject"
-                          variant="danger"
-                          style={{ flex: 1 }}
-                          onPress={(e) => { e.stopPropagation(); setRejectingOrder({ orderId: order.orderId, orderNumber: order.orderNumber }); }}
-                        />
-                      </>
-                    )}
-                    {order.status === 'ACCEPTED' && (
-                      <Button
-                        label="Start Preparing"
-                        variant="primary"
-                        style={{ flex: 1 }}
-                        onPress={async (e) => { e.stopPropagation(); await transitionStatus({ orderId: order.orderId, targetStatus: 'PREPARING' }).unwrap(); }}
-                      />
-                    )}
-                    {order.status === 'PREPARING' && (
-                      <Button
-                        label="Mark Ready"
-                        variant="primary"
-                        style={{ flex: 1, backgroundColor: '#16A34A' }}
-                        onPress={async (e) => { e.stopPropagation(); await transitionStatus({ orderId: order.orderId, targetStatus: 'READY_FOR_PICKUP' }).unwrap(); }}
-                      />
-                    )}
-                    {order.status === 'READY_FOR_PICKUP' && (
-                      <Button
-                        label="Mark Collected/Delivered"
-                        variant="secondary"
-                        style={{ flex: 1 }}
-                        onPress={async (e) => { e.stopPropagation(); await transitionStatus({ orderId: order.orderId, targetStatus: 'DELIVERED' }).unwrap(); }}
-                      />
-                    )}
-                  </View>
-                </Pressable>
+                  onOpenRejectModal={(orderId, orderNumber) => {
+                    setRejectingOrder({ orderId, orderNumber });
+                  }}
+                />
               ))}
             </View>
           )}
@@ -665,7 +589,7 @@ export function DashboardScreen({ navigation }: Props) {
       {/* INCOMING ORDER ALERT MODAL WITH SOUND */}
       {(() => {
         const incomingOrderNeedingAction = orders.find(
-          (o) => o.status === 'CONFIRMED' && !dismissedAlertOrderIds.includes(o.orderId)
+          (o) => (o.status === 'CONFIRMED' || o.status === 'PLACED') && !dismissedAlertOrderIds.includes(o.orderId)
         ) ?? null;
 
         return (

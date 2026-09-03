@@ -246,14 +246,16 @@ export function MenuItemsScreen({ navigation }: Props) {
       }
     }
 
-    if (!isInitialized && (isUsingMock || (!menuQuery.isLoading && menuItems.length === 0))) {
-      const mockItems: NormalizedMenuItem[] = [];
-      for (const cat of MOCK_CATEGORIES) {
-        for (const item of cat.items) {
-          mockItems.push(normalizeMenuItem(item, cat.name, cat.categoryId));
+    if (!isInitialized) {
+      if (isUsingMock) {
+        const mockItems: NormalizedMenuItem[] = [];
+        for (const cat of MOCK_CATEGORIES) {
+          for (const item of cat.items) {
+            mockItems.push(normalizeMenuItem(item, cat.name, cat.categoryId));
+          }
         }
+        setMenuItems(mockItems);
       }
-      setMenuItems(mockItems);
       setIsInitialized(true);
     }
   }, [menuQuery.data, isUsingMock, menuQuery.isLoading, isInitialized]);

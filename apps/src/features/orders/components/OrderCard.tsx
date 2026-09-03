@@ -37,7 +37,7 @@ export function OrderCard({
   const detail = orderDetailsQuery.data;
   const items = detail?.items ?? [];
   const status = order.status;
-  const isPending = ['CONFIRMED', 'PENDING'].includes(status);
+  const isPending = ['CONFIRMED', 'PENDING', 'PLACED'].includes(status);
   const actions = restaurantActionsForStatus(status);
 
   return (
@@ -160,12 +160,8 @@ export function OrderCard({
         {detail ? (
           <>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text variant="caption" color={tokens.color.textSecondary}>Subtotal</Text>
+              <Text variant="caption" color={tokens.color.textSecondary}>Items Total</Text>
               <Text variant="caption" color={tokens.color.textPrimary}>{formatMoney(detail.subtotal)}</Text>
-            </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text variant="caption" color={tokens.color.textSecondary}>Delivery Fee</Text>
-              <Text variant="caption" color={tokens.color.textPrimary}>{formatMoney(detail.deliveryFee)}</Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <Text variant="caption" color={tokens.color.textSecondary}>Tax</Text>
