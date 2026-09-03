@@ -259,9 +259,19 @@ export function IncomingOrdersScreen({ navigation }: Props) {
         targetStatus,
         reason: reason ?? null,
       }).unwrap();
+
+      // Auto-jump to PREPARING immediately after ACCEPTED
+      if (targetStatus === 'ACCEPTED' && !isUsingMock) {
+        await transitionStatus({
+          orderId,
+          targetStatus: 'PREPARING',
+          reason: null,
+        }).unwrap();
+      }
+
       setRejectingOrder(null);
       setToast({
-        message: `Order status updated to ${targetStatus}.`,
+        message: targetStatus === 'ACCEPTED' ? `Order accepted and moved to PREPARING.` : `Order status updated to ${targetStatus}.`,
         variant: 'success',
       });
       void ordersQuery.refetch();

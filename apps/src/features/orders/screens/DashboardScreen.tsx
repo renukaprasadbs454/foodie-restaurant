@@ -572,6 +572,9 @@ export function DashboardScreen({ navigation }: Props) {
                   onTransitionStatus={async (orderId, targetStatus) => {
                     try {
                       await transitionStatus({ orderId, targetStatus }).unwrap();
+                      if (targetStatus === 'ACCEPTED') {
+                        await transitionStatus({ orderId, targetStatus: 'PREPARING' }).unwrap();
+                      }
                     } catch (e) {
                       // Error handled by mutation
                     }

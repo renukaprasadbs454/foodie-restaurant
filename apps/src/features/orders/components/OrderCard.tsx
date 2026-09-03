@@ -183,57 +183,42 @@ export function OrderCard({
       {/* ORDER ACTION BUTTONS */}
       <View
         style={{
-          flexDirection: 'row',
-          gap: tokens.spacing.xs,
-          alignItems: 'center',
-          justifyContent: 'flex-end',
+          gap: tokens.spacing.sm,
           paddingTop: tokens.spacing.xs,
         }}
       >
         {['CONFIRMED', 'PLACED', 'PENDING'].includes(status) ? (
-          <>
+          <View style={{ flexDirection: 'row', gap: tokens.spacing.sm }}>
             <Button
               label="Reject"
               accessibilityLabel={`Reject order ${order.orderNumber}`}
               variant="danger"
-              style={{ paddingHorizontal: 12, height: 38 }}
+              style={{ flex: 1, paddingHorizontal: 12, height: 44 }}
               onPress={() => onOpenRejectModal(order.orderId, order.orderNumber)}
             />
             <Button
               label="Accept Order"
               accessibilityLabel={`Accept order ${order.orderNumber}`}
               loading={isTransitioning}
-              style={{ backgroundColor: BRAND_PRIMARY, paddingHorizontal: 16, height: 38 }}
+              style={{ flex: 2, backgroundColor: BRAND_PRIMARY, paddingHorizontal: 16, height: 44 }}
               onPress={() => onTransitionStatus(order.orderId, 'ACCEPTED')}
             />
-          </>
+          </View>
         ) : ['ACCEPTED', 'PREPARING'].includes(status) ? (
-          <Button
-            label="Food is Ready 🍱"
-            accessibilityLabel={`Mark food ready for pickup for order ${order.orderNumber}`}
-            loading={isTransitioning}
-            style={{ backgroundColor: '#16A34A', paddingHorizontal: 16, height: 40, borderRadius: 10 }}
-            onPress={() => onTransitionStatus(order.orderId, 'READY_FOR_PICKUP')}
-          />
+          <View style={{ width: '100%', gap: tokens.spacing.sm }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#EFF6FF', paddingVertical: 8, borderRadius: 8, gap: 6 }}>
+              <Text style={{ fontSize: 13 }}>🟢</Text>
+              <Text style={{ color: '#2563EB', fontWeight: 'bold' }}>Cooking in progress...</Text>
+            </View>
+            <Button
+              label="Mark Ready for Pickup"
+              accessibilityLabel={`Mark food ready for pickup for order ${order.orderNumber}`}
+              loading={isTransitioning}
+              style={{ backgroundColor: '#16A34A', paddingHorizontal: 16, height: 46, borderRadius: 10, width: '100%' }}
+              onPress={() => onTransitionStatus(order.orderId, 'READY_FOR_PICKUP')}
+            />
+          </View>
         ) : null}
-
-        <Pressable
-          onPress={onViewDetails}
-          accessibilityRole="button"
-          accessibilityLabel={`View details for order ${order.orderNumber}`}
-          style={{
-            paddingHorizontal: tokens.spacing.sm,
-            paddingVertical: 8,
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: tokens.color.border,
-            backgroundColor: tokens.color.surface,
-          }}
-        >
-          <Text variant="caption" style={{ color: BRAND_PRIMARY, fontWeight: 'bold' }}>
-            View Details →
-          </Text>
-        </Pressable>
       </View>
     </Card>
   );
