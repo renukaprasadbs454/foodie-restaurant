@@ -5,7 +5,7 @@
 
 export const MOCK_CONFIG = {
   /** Master toggle to enable mock data fallbacks when real API data is unavailable or empty */
-  ENABLE_MOCK_FALLBACK: true,
+  ENABLE_MOCK_FALLBACK: false,
 
   /** Toggle whether to display a subtle "DEMO MODE" badge when mock data is active */
   SHOW_MOCK_INDICATOR: true,
