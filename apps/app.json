@@ -9,9 +9,17 @@
     "scheme": "foodie-restaurant",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.foodie.restaurant"
+      "bundleIdentifier": "com.foodie.restaurant",
+      "config": {
+        "googleMapsApiKey": "AIzaSyBef3prJr9YvHFDYczEJ-mzZfSlLd2vHbE"
+      }
     },
     "android": {
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyBef3prJr9YvHFDYczEJ-mzZfSlLd2vHbE"
+        }
+      },
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./src/assets/android-icon-foreground.png",

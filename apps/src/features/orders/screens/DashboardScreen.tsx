@@ -59,7 +59,7 @@ export function DashboardScreen({ navigation }: Props) {
     { page: 0, size: 20, sort: 'placedAt' },
     {
       refetchOnFocus: true,
-      pollingInterval: 10_000, // Poll every 10 seconds for real-time customer order updates
+      pollingInterval: 5000, // Poll every 5 seconds for real-time customer order updates without UI interruption
     },
   );
 
@@ -481,6 +481,15 @@ export function DashboardScreen({ navigation }: Props) {
               }}
             />
             <Button
+              label="🔄 Refresh"
+              accessibilityLabel="Refresh orders"
+              variant="secondary"
+              style={{ flex: 1, minWidth: 140 }}
+              onPress={() => {
+                activeQuery.refetch();
+              }}
+            />
+            <Button
               label="💰 Settlements"
               accessibilityLabel="Open settlement history"
               variant="secondary"
@@ -560,9 +569,6 @@ export function DashboardScreen({ navigation }: Props) {
                   accessibilityRole="button"
                   accessibilityLabel={`View details for order ${order.orderNumber}`}
                   style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
                     padding: tokens.spacing.sm,
                     borderRadius: tokens.radius.md,
                     backgroundColor: tokens.color.surface,
@@ -570,37 +576,84 @@ export function DashboardScreen({ navigation }: Props) {
                     borderColor: tokens.color.border,
                   }}
                 >
-                  <View style={{ gap: 2 }}>
-                    <Text variant="label" style={{ color: tokens.color.textPrimary, fontWeight: 'bold' }}>
-                      {order.orderNumber}
-                    </Text>
-                    <Text variant="caption" color={tokens.color.textSecondary}>
-                      {order.placedAt
-                        ? new Date(order.placedAt).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
-                        : 'Just now'}
-                    </Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+
+                    <View style={{ gap: 2 }}>
+                      <Text variant="label" style={{ color: tokens.color.textPrimary, fontWeight: 'bold' }}>
+                        {order.orderNumber}
+                      </Text>
+                      <Text variant="caption" color={tokens.color.textSecondary}>
+                        {order.placedAt
+                          ? new Date(order.placedAt).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                          : 'Just now'}
+                      </Text>
+                    </View>
+
+                    <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                      <Text variant="label" style={{ color: BRAND_PRIMARY, fontWeight: 'bold' }}>
+                        {formatMoney(order.totalAmount)}
+                      </Text>
+                      <Badge
+                        label={order.status}
+                        tone={
+                          order.status === 'CONFIRMED'
+                            ? 'warning'
+                            : order.status === 'PREPARING'
+                              ? 'accent'
+                              : order.status === 'READY_FOR_PICKUP' || order.status === 'DELIVERED'
+                                ? 'success'
+                                : 'accent'
+                        }
+                        accessibilityLabel={`Order status ${order.status}`}
+                      />
+                    </View>
                   </View>
 
-                  <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                    <Text variant="label" style={{ color: BRAND_PRIMARY, fontWeight: 'bold' }}>
-                      {formatMoney(order.totalAmount)}
-                    </Text>
-                    <Badge
-                      label={order.status}
-                      tone={
-                        order.status === 'CONFIRMED'
-                          ? 'warning'
-                          : order.status === 'PREPARING'
-                            ? 'accent'
-                            : order.status === 'READY_FOR_PICKUP' || order.status === 'DELIVERED'
-                              ? 'success'
-                              : 'accent'
-                      }
-                      accessibilityLabel={`Order status ${order.status}`}
-                    />
+                  {/* LIVE ORDER ACTIONS DIRECTLY ON DASHBOARD */}
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                    {order.status === 'CONFIRMED' && (
+                      <>
+                        <Button
+                          label="Accept"
+                          variant="primary"
+                          style={{ flex: 1 }}
+                          onPress={async (e) => { e.stopPropagation(); await transitionStatus({ orderId: order.orderId, targetStatus: 'ACCEPTED' }).unwrap(); }}
+                        />
+                        <Button
+                          label="Reject"
+                          variant="danger"
+                          style={{ flex: 1 }}
+                          onPress={(e) => { e.stopPropagation(); setRejectingOrder({ orderId: order.orderId, orderNumber: order.orderNumber }); }}
+                        />
+                      </>
+                    )}
+                    {order.status === 'ACCEPTED' && (
+                      <Button
+                        label="Start Preparing"
+                        variant="primary"
+                        style={{ flex: 1 }}
+                        onPress={async (e) => { e.stopPropagation(); await transitionStatus({ orderId: order.orderId, targetStatus: 'PREPARING' }).unwrap(); }}
+                      />
+                    )}
+                    {order.status === 'PREPARING' && (
+                      <Button
+                        label="Mark Ready"
+                        variant="primary"
+                        style={{ flex: 1, backgroundColor: '#16A34A' }}
+                        onPress={async (e) => { e.stopPropagation(); await transitionStatus({ orderId: order.orderId, targetStatus: 'READY_FOR_PICKUP' }).unwrap(); }}
+                      />
+                    )}
+                    {order.status === 'READY_FOR_PICKUP' && (
+                      <Button
+                        label="Mark Collected/Delivered"
+                        variant="secondary"
+                        style={{ flex: 1 }}
+                        onPress={async (e) => { e.stopPropagation(); await transitionStatus({ orderId: order.orderId, targetStatus: 'DELIVERED' }).unwrap(); }}
+                      />
+                    )}
                   </View>
                 </Pressable>
               ))}

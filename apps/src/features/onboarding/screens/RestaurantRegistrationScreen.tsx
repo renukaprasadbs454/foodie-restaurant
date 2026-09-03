@@ -30,7 +30,7 @@ import {
 } from '../types';
 import type { OnboardingStackParamList } from '../../../navigation/types';
 
-import MapView, { Marker, Region } from 'react-native-maps';
+import MapView, { Marker, Region, PROVIDER_GOOGLE } from 'react-native-maps';
 
 type Props = NativeStackScreenProps<
   OnboardingStackParamList,
@@ -349,6 +349,7 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
           {/* Interactive Map Picker */}
           <View style={{ height: 180, borderRadius: 14, overflow: 'hidden', borderColor: '#F59E0B', borderWidth: 2, marginVertical: 4 }}>
             <MapView
+              provider={PROVIDER_GOOGLE}
               ref={mapRef}
               style={{ flex: 1 }}
               region={mapRegion}
