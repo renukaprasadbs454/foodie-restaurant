@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as Location from 'expo-location';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Toast,
   trackAnalyticsEvent,
@@ -52,6 +53,7 @@ const BRAND_ACCENT = '#F59E0B';  // Warm Gold / Amber
 export function RestaurantRegistrationScreen({ navigation }: Props) {
   const { isConnected } = useConnectivity();
   const dispatch = useAppDispatch();
+  const insets = useSafeAreaInsets();
   const [register, registerState] = useRegisterRestaurantMutation();
 
   const [name, setName] = useState('');
@@ -237,7 +239,7 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
       >
         {/* Brand Banner Header (Matches Dashboard Header) */}
-        <View style={styles.headerCard}>
+        <View style={[styles.headerCard, { paddingTop: Math.max(20, insets.top) }]}>
           <View style={styles.headerRow}>
             <View style={{ flex: 1, gap: 4 }}>
               <Text style={styles.headerBadge}>FOODIE PARTNER ONBOARDING</Text>

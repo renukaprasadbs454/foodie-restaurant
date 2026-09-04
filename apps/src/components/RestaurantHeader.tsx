@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, Pressable, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, useTheme } from 'foodie-shared-rn';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { selectRestaurantId } from '../features/onboarding/restaurantOnboardingSlice';
@@ -26,6 +27,7 @@ export function RestaurantHeader({
 }: Props) {
   const { tokens } = useTheme();
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const isWide = width >= 768;
 
   const restaurantId = useAppSelector(selectRestaurantId);
@@ -77,7 +79,7 @@ export function RestaurantHeader({
   };
 
   return (
-    <View style={{ backgroundColor: BRAND_PRIMARY, zIndex: 100 }}>
+    <View style={{ backgroundColor: BRAND_PRIMARY, zIndex: 100, paddingTop: insets.top }}>
       <View
         style={{
           height: isWide ? 64 : 58,

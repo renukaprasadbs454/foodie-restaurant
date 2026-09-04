@@ -1,4 +1,5 @@
 import { baseApi } from '../baseApi';
+import { Platform } from 'react-native';
 import type {
   RegisterRestaurantRequest,
   RestaurantDetail,
@@ -153,11 +154,21 @@ export const restaurantsApi = baseApi.injectEndpoints({
     >({
       async queryFn(arg, _queryApi, _extraOptions, fetchWithBQ) {
         try {
-          const response = await fetch(arg.uri);
-          const blob = await response.blob();
           const formData = new FormData();
           formData.append('imageType', arg.imageType);
-          formData.append('file', blob, arg.fileName);
+
+          if (Platform.OS === 'web') {
+            const response = await fetch(arg.uri);
+            const blob = await response.blob();
+            formData.append('file', blob, arg.fileName);
+          } else {
+            formData.append('file', {
+              uri: arg.uri,
+              type: arg.mimeType,
+              name: arg.fileName,
+            } as any);
+          }
+
           const result = await fetchWithBQ({
             url: '/api/v1/restaurants/me/images',
             method: 'POST',
