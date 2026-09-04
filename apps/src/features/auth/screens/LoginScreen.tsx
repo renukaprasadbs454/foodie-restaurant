@@ -128,6 +128,9 @@ export function LoginScreen() {
         userType: 'RESTAURANT',
       }).unwrap();
       trackAnalyticsEvent('auth_otp_verified');
+      import('@react-native-async-storage/async-storage').then(m => {
+        m.default.setItem('restaurant_auth_phone', phoneNumber);
+      });
       await applyAuthSession(dispatch, data);
     } catch (err) {
       handleApiError(toUnwrappedApiError(err));

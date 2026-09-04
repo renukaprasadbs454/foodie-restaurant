@@ -151,7 +151,11 @@ export function RestaurantProfileScreen({ navigation }: Props) {
     setLongitude(
       profileData.address?.longitude != null ? String(profileData.address.longitude) : '',
     );
-    setPhone((profileData as MockRestaurantProfile).phone ?? '+91 98765 43210');
+    import('@react-native-async-storage/async-storage').then(m => {
+      m.default.getItem('restaurant_auth_phone').then(pn => {
+        setPhone(pn || ((profileData as MockRestaurantProfile).phone ?? '+91 98765 43210'));
+      });
+    });
     setEmail((profileData as MockRestaurantProfile).email ?? 'contact@foodierestaurant.com');
     setOpeningTime((profileData as MockRestaurantProfile).openingTime ?? '11:00 AM');
     setClosingTime((profileData as MockRestaurantProfile).closingTime ?? '11:00 PM');
@@ -385,6 +389,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
                     onChangeText={setPhone}
                     accessibilityLabel="Phone Number"
                     keyboardType="phone-pad"
+                    editable={false}
                   />
                 </View>
                 <View style={{ flex: 1 }}>

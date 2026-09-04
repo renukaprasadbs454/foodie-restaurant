@@ -46,7 +46,10 @@
       ]
     },
     "web": {
-      "favicon": "./src/assets/favicon.png"
+      "favicon": "./src/assets/favicon.png",
+      "config": {
+        "googleMapsApiKey": "AIzaSyBef3prJr9YvHFDYczEJ-mzZfSlLd2vHbE"
+      }
     },
     "plugins": [
       "expo-secure-store",
