@@ -13,9 +13,7 @@ type Extra = {
 const extra = (Constants.expoConfig?.extra ?? {}) as Extra;
 
 let apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? extra.apiBaseUrl ?? 'https://api.foodie.kwiko.org';
-if (Platform.OS === 'web' && __DEV__ && typeof window !== 'undefined' && window.location?.origin) {
-  apiBaseUrl = window.location.origin;
-}
+
 
 export const ENV = {
   apiBaseUrl,
