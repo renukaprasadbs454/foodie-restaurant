@@ -252,6 +252,14 @@ export function MainNavigator() {
           title: 'Profile',
           tabBarIcon: ({ focused }) => <TabIcon icon="👤" focused={focused} />,
         }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate('ProfileTab', {
+              screen: 'RestaurantProfile',
+            });
+          },
+        })}
       />
     </Tab.Navigator>
   );

@@ -50,7 +50,7 @@ export type MainTabParamList = {
   OrdersTab: undefined;
   MenuTab: undefined;
   ReviewsTab: undefined;
-  ProfileTab: undefined;
+  ProfileTab: undefined | import('@react-navigation/native').NavigatorScreenParams<ProfileStackParamList>;
 };
 
 export type RootStackParamList = {

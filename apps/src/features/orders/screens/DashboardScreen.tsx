@@ -518,7 +518,9 @@ export function DashboardScreen({ navigation }: Props) {
               style={{ flex: 1, minWidth: 140 }}
               onPress={() => {
                 trackAnalyticsEvent('open_profile_tapped');
-                navigation.getParent()?.navigate('ProfileTab');
+                navigation.getParent()?.navigate('ProfileTab', {
+                  screen: 'RestaurantProfile',
+                });
               }}
             />
           </View>

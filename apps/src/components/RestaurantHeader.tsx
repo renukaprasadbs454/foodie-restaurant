@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Modal, Pressable, View, useWindowDimensions } from 'react-native';
 import { Text, useTheme } from 'foodie-shared-rn';
-import { useAppSelector } from '../store/hooks';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { selectRestaurantId } from '../features/onboarding/restaurantOnboardingSlice';
+import { logoutRestaurant } from '../features/auth/session';
+import { store } from '../store/store';
 
 type Props = {
   title?: string;
@@ -27,6 +29,7 @@ export function RestaurantHeader({
   const isWide = width >= 768;
 
   const restaurantId = useAppSelector(selectRestaurantId);
+  const dispatch = useAppDispatch();
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
 
@@ -54,12 +57,16 @@ export function RestaurantHeader({
     }
   };
 
-  const handleLogoutPress = () => {
+  const handleLogoutPress = async () => {
     setIsMenuOpen(false);
     if (onLogout) {
       onLogout();
-    } else if (navigation && typeof navigation.navigate === 'function') {
-      navigation.navigate('ProfileTab');
+    } else {
+      try {
+        await logoutRestaurant(dispatch, store.getState.bind(store));
+      } catch (e) {
+        console.error('Logout failed:', e);
+      }
     }
   };
 
