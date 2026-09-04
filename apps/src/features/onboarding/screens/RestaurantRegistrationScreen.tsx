@@ -32,6 +32,15 @@ import type { OnboardingStackParamList } from '../../../navigation/types';
 
 import MapView, { Marker, Region, PROVIDER_GOOGLE } from 'react-native-maps';
 
+if (Platform.OS === 'web') {
+  try {
+    const { default: WebMap } = require('@teovilla/react-native-web-maps');
+    WebMap.init({ apiKey: 'AIzaSyBef3prJr9YvHFDYczEJ-mzZfSlLd2vHbE' });
+  } catch (e) {
+    console.error('Failed to init react-native-web-maps', e);
+  }
+}
+
 type Props = NativeStackScreenProps<
   OnboardingStackParamList,
   'RestaurantRegistration'
@@ -349,9 +358,9 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
           {/* Interactive Map Picker */}
           <View style={{ height: 180, borderRadius: 14, overflow: 'hidden', borderColor: '#F59E0B', borderWidth: 2, marginVertical: 4 }}>
             <MapView
-              provider={PROVIDER_GOOGLE}
+              provider={Platform.OS === 'web' ? undefined : PROVIDER_GOOGLE}
               ref={mapRef}
-              style={{ flex: 1 }}
+              style={{ flex: 1, height: '100%', width: '100%' }}
               region={mapRegion}
               onRegionChangeComplete={(r) => {
                 setMapRegion(r);
