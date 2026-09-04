@@ -141,11 +141,14 @@ export function createBaseApi<TagTypes extends string = string>(
             fields: envelope.error.fields ?? null,
           },
         };
-        logger.error('API application error', {
-          url: extractUrl(requestArgs),
-          status: String(fetchError.status),
-          code,
-        });
+        const urlStr = extractUrl(requestArgs);
+        if (!(code === 'RESOURCE_NOT_FOUND' && urlStr.includes('/restaurants/me'))) {
+          logger.error('API application error', {
+            url: urlStr,
+            status: String(fetchError.status),
+            code,
+          });
+        }
         return { error: apiError, meta: result.meta };
       }
 
@@ -193,11 +196,14 @@ export function createBaseApi<TagTypes extends string = string>(
         });
       }
 
-      logger.error('API application error', {
-        requestId,
-        code,
-        url: extractUrl(requestArgs),
-      });
+      const urlStr = extractUrl(requestArgs);
+      if (!(code === 'RESOURCE_NOT_FOUND' && urlStr.includes('/restaurants/me'))) {
+        logger.error('API application error', {
+          requestId,
+          code,
+          url: urlStr,
+        });
+      }
 
       // TOKEN_REUSE_DETECTED — never retry (Blueprint §13.3)
       if (code === 'TOKEN_REUSE_DETECTED') {
