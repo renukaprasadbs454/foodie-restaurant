@@ -78,7 +78,12 @@ export function RestaurantHeader({
 
   const handleNotificationPress = () => {
     if (navigation && typeof navigation.navigate === 'function') {
-      navigation.navigate('NotificationsHome');
+      const parent = navigation.getParent();
+      if (parent) {
+        parent.navigate('ProfileTab', { screen: 'NotificationsHome' });
+      } else {
+        navigation.navigate('ProfileTab', { screen: 'NotificationsHome' });
+      }
     }
   };
 
