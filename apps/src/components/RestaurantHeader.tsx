@@ -6,6 +6,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { selectRestaurantId } from '../features/onboarding/restaurantOnboardingSlice';
 import { logoutRestaurant } from '../features/auth/session';
 import { store } from '../store/store';
+import { useGetRestaurantProfileQuery, useToggleRestaurantStatusMutation } from '../api/endpoints/restaurantsApi';
 
 type Props = {
   title?: string;
@@ -32,8 +33,11 @@ export function RestaurantHeader({
 
   const restaurantId = useAppSelector(selectRestaurantId);
   const dispatch = useAppDispatch();
-  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const { data: profile } = useGetRestaurantProfileQuery(undefined, { skip: !restaurantId });
+  const [toggleStatus] = useToggleRestaurantStatusMutation();
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
+
+  const isOnline = profile?.isOpen ?? false;
 
   const displayTitle: string = title;
   const displaySubtitle: string =
@@ -158,7 +162,7 @@ export function RestaurantHeader({
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.sm }}>
           {/* ONLINE / OFFLINE TOGGLE PILL */}
           <Pressable
-            onPress={() => setIsOnline((prev) => !prev)}
+            onPress={() => toggleStatus(!isOnline)}
             accessibilityRole="button"
             accessibilityLabel={`Restaurant status ${isOnline ? 'Online' : 'Offline'}`}
             style={({ pressed }) => [{

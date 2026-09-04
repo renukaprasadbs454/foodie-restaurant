@@ -94,6 +94,20 @@ export const restaurantsApi = baseApi.injectEndpoints({
           ]
           : [{ type: 'Restaurant', id: 'LIST' }],
     }),
+    toggleRestaurantStatus: builder.mutation<RestaurantDetail, boolean>({
+      query: (isOpen) => ({
+        url: `/api/v1/restaurants/me/status?isOpen=${isOpen}`,
+        method: 'PUT',
+      }),
+      transformResponse: (response: any) => response?.data || response,
+      invalidatesTags: (result) =>
+        result?.restaurantId
+          ? [
+            { type: 'Restaurant', id: result.restaurantId },
+            { type: 'Restaurant', id: 'LIST' },
+          ]
+          : [{ type: 'Restaurant', id: 'LIST' }],
+    }),
     getRestaurantReviews: builder.query<
       RestaurantReview[],
       RestaurantReviewsParams
@@ -202,6 +216,7 @@ export const restaurantsApi = baseApi.injectEndpoints({
 export const {
   useRegisterRestaurantMutation,
   useGetRestaurantProfileQuery,
+  useToggleRestaurantStatusMutation,
   useGetRestaurantQuery,
   useUpdateRestaurantProfileMutation,
   useGetRestaurantReviewsQuery,

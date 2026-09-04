@@ -60,6 +60,7 @@ export type RestaurantDetail = {
   coverImageUrl?: string | null;
   avgRating?: number | string | null;
   commissionPct?: number | string | null;
+  isOpen?: boolean;
 };
 
 export type RestaurantDocumentUploadResult = {

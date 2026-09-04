@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import {
   Image,
   Pressable,
-  RefreshControl,
   ScrollView,
   View,
   useWindowDimensions,
@@ -234,15 +233,6 @@ export function DashboardScreen({ navigation }: Props) {
           alignSelf: isWide ? 'center' : undefined,
           width: '100%',
         }}
-        refreshControl={
-          <RefreshControl
-            refreshing={activeQuery.isFetching || restaurantQuery.isFetching}
-            onRefresh={() => {
-              void restaurantQuery.refetch();
-              void activeQuery.refetch();
-            }}
-          />
-        }
       >
         {/* DEMO MODE BADGE (SUBTLE) */}
         {isUsingMock ? <DemoModeIndicator isMockActive={true} /> : null}
@@ -479,15 +469,6 @@ export function DashboardScreen({ navigation }: Props) {
               onPress={() => {
                 trackAnalyticsEvent('open_menu_tapped');
                 navigation.getParent()?.navigate('MenuTab');
-              }}
-            />
-            <Button
-              label="🔄 Refresh"
-              accessibilityLabel="Refresh orders"
-              variant="secondary"
-              style={{ flex: 1, minWidth: 140 }}
-              onPress={() => {
-                activeQuery.refetch();
               }}
             />
             <Button
