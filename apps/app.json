@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Delimo-Restaurant",
-    "slug": "delimo-restaurant",
+    "slug": "foodie-restaurant",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./src/assets/icon.png",
