@@ -39,7 +39,7 @@ export function RestaurantHeader({
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
 
   const notificationsQuery = useGetNotificationsQuery(
-    { unreadOnly: true, page: 0, size: 50 },
+    { unreadOnly: true, page: 0, size: 20 },
     { skip: !restaurantId, pollingInterval: 15000 }
   );
   const unreadCount = notificationsQuery.data?.length || 0;

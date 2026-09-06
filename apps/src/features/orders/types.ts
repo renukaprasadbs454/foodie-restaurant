@@ -62,7 +62,8 @@ export type RestaurantTransitionStatus =
   | 'ACCEPTED'
   | 'REJECTED'
   | 'PREPARING'
-  | 'READY_FOR_PICKUP';
+  | 'READY_FOR_PICKUP'
+  | 'DELIVERED';
 
 export type TransitionOrderStatusArg = {
   orderId: string;

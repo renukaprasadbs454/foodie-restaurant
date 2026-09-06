@@ -218,6 +218,16 @@ export function OrderCard({
               onPress={() => onTransitionStatus(order.orderId, 'READY_FOR_PICKUP')}
             />
           </View>
+        ) : status === 'READY_FOR_PICKUP' ? (
+          <View style={{ width: '100%', gap: tokens.spacing.sm }}>
+            <Button
+              label="Hand Over (Mark Completed)"
+              accessibilityLabel={`Complete order ${order.orderNumber}`}
+              loading={isTransitioning}
+              style={{ paddingHorizontal: 16, height: 46, borderRadius: 10, width: '100%' }}
+              onPress={() => onTransitionStatus(order.orderId, 'DELIVERED')}
+            />
+          </View>
         ) : null}
       </View>
     </Card>
