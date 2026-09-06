@@ -216,16 +216,16 @@ export function RestaurantHeader({
             accessibilityRole="button"
             accessibilityLabel="Notifications"
             style={({ pressed }) => [{
-              width: 36,
-              height: 36,
-              borderRadius: 18,
+              width: 44,
+              height: 44,
+              borderRadius: 22,
               backgroundColor: pressed ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.08)',
               alignItems: 'center',
               justifyContent: 'center',
               position: 'relative',
             }]}
           >
-            <Text style={{ fontSize: 17 }}>🔔</Text>
+            <Text style={{ fontSize: 20 }}>🔔</Text>
             {unreadCount > 0 && (
               <View
                 style={{
@@ -233,17 +233,17 @@ export function RestaurantHeader({
                   top: -2,
                   right: -2,
                   backgroundColor: '#EF4444',
-                  borderRadius: 10,
-                  paddingHorizontal: 4,
-                  minWidth: 16,
-                  height: 16,
+                  borderRadius: 12,
+                  paddingHorizontal: 5,
+                  minWidth: 20,
+                  height: 20,
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderWidth: 1.5,
                   borderColor: BRAND_PRIMARY,
                 }}
               >
-                <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' }}>
+                <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' }}>
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </Text>
               </View>

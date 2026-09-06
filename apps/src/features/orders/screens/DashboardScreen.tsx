@@ -66,8 +66,7 @@ export function DashboardScreen({ navigation }: Props) {
     },
   );
 
-  const todayStr = React.useMemo(() => new Date().toISOString().split('T')[0], []);
-  const summaryQuery = useGetDashboardSummaryQuery({ dateFrom: todayStr, dateTo: todayStr }, {
+  const summaryQuery = useGetDashboardSummaryQuery(undefined, {
     skip: !storedRestaurantId,
     refetchOnFocus: true,
   });
