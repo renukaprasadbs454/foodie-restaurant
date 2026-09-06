@@ -95,6 +95,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
   const [openingTime, setOpeningTime] = useState('');
   const [closingTime, setClosingTime] = useState('');
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [coverUri, setCoverUri] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   const [toast, setToast] = useState<{
@@ -160,6 +161,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
     setOpeningTime((profileData as MockRestaurantProfile).openingTime ?? '11:00 AM');
     setClosingTime((profileData as MockRestaurantProfile).closingTime ?? '11:00 PM');
     setAvatarUri(profileData.logoImageUrl ?? null);
+    setCoverUri(profileData.coverImageUrl ?? null);
     setHydrated(true);
   }, [profileData, hydrated]);
 
@@ -199,6 +201,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
 
     try {
       await updateProfile(validated.value).unwrap();
+      await import('@react-native-async-storage/async-storage').then(m => m.default.setItem('restaurant_auth_phone', phone));
       setToast({ message: 'Profile saved successfully.', variant: 'success' });
       setHydrated(false);
       void query.refetch();
@@ -243,6 +246,42 @@ export function RestaurantProfileScreen({ navigation }: Props) {
     }
   };
 
+  const onPickCoverPhoto = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setToast({ message: 'Gallery permission denied.', variant: 'warning' });
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 1,
+      allowsEditing: true,
+      aspect: [16, 9],
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+
+    if (isUsingMock) {
+      setCoverUri(asset.uri);
+      setToast({ message: 'Cover updated in Demo Mode.', variant: 'success' });
+      return;
+    }
+
+    const mimeType = asset.mimeType ?? 'image/jpeg';
+    try {
+      await uploadImage({
+        imageType: 'COVER',
+        uri: asset.uri,
+        mimeType,
+        fileName: asset.fileName ?? 'cover.jpg',
+      }).unwrap();
+      setCoverUri(asset.uri);
+      setToast({ message: 'Cover photo uploaded successfully.', variant: 'success' });
+    } catch (error) {
+      handleError(toUnwrappedApiError(error));
+    }
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: tokens.color.background }}>
       <ScrollView
@@ -273,7 +312,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
             <Card style={{ padding: 0, overflow: 'hidden', borderRadius: 16 }}>
               <View style={{ position: 'relative', height: 160 }}>
                 <Image
-                  source={{ uri: profileData?.coverImageUrl ? (profileData.coverImageUrl.startsWith('/api') ? `${ENV.apiBaseUrl}${profileData.coverImageUrl}` : profileData.coverImageUrl) : COVER_IMAGE_URL }}
+                  source={{ uri: coverUri ? (coverUri.startsWith('/api') ? `${ENV.apiBaseUrl}${coverUri}` : coverUri) : COVER_IMAGE_URL }}
                   style={{ width: '100%', height: '100%' }}
                   resizeMode="cover"
                 />
@@ -287,6 +326,24 @@ export function RestaurantProfileScreen({ navigation }: Props) {
                     backgroundColor: 'rgba(20, 83, 45, 0.35)',
                   }}
                 />
+                <Pressable
+                  onPress={() => void onPickCoverPhoto()}
+                  style={{
+                    position: 'absolute',
+                    top: tokens.spacing.md,
+                    right: tokens.spacing.md,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 16,
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Change Cover Photo"
+                >
+                  <Text variant="label" style={{ color: '#FFFFFF', fontWeight: 'bold' }}>
+                    📷 Edit Cover
+                  </Text>
+                </Pressable>
               </View>
 
               <View
@@ -389,7 +446,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
                     onChangeText={setPhone}
                     accessibilityLabel="Phone Number"
                     keyboardType="phone-pad"
-                    editable={false}
+                    editable={true}
                   />
                 </View>
                 <View style={{ flex: 1 }}>
