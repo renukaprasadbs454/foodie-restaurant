@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, View } from 'react-native';
+import { RefreshControl, ScrollView, View, Linking } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Button,
@@ -225,6 +225,20 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
                     <Text variant="caption" color={tokens.color.textSecondary} style={{ marginTop: 2 }}>
                       📍 {order.deliveryAddress}
                     </Text>
+                  ) : null}
+
+                  {order.customerPhone ? (
+                    <Button
+                      label="📞 Call Customer"
+                      accessibilityLabel="Call Customer"
+                      variant="secondary"
+                      style={{ marginTop: tokens.spacing.sm, paddingHorizontal: 12, height: 36, alignSelf: 'flex-start' }}
+                      onPress={() => {
+                        Linking.openURL(`tel:${order.customerPhone}`).catch(() => {
+                          setToast({ message: `Cannot place call.`, variant: 'error' });
+                        });
+                      }}
+                    />
                   ) : null}
                 </View>
                 <OrderStatusBadge status={order.status} size="lg" />
