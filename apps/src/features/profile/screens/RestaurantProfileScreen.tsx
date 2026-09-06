@@ -136,7 +136,16 @@ export function RestaurantProfileScreen({ navigation }: Props) {
   useEffect(() => {
     if (!profileData || hydrated) return;
     setName(profileData.name ?? '');
-    setDescription(profileData.description ?? '');
+    const desc = profileData.description ?? '';
+    const phoneMatch = desc.match(/\[PHONE:(.*?)\]/);
+    const openMatch = desc.match(/\[OPEN:(.*?)\]/);
+    const closeMatch = desc.match(/\[CLOSE:(.*?)\]/);
+
+    setDescription(desc.replace(/\[(?:PHONE|OPEN|CLOSE):.*?\]/g, '').trim());
+    setPhone(phoneMatch ? phoneMatch[1] : (profileData as MockRestaurantProfile).phone ?? '+91 98765 43210');
+    setOpeningTime(openMatch ? openMatch[1] : (profileData as MockRestaurantProfile).openingTime ?? '11:00 AM');
+    setClosingTime(closeMatch ? closeMatch[1] : (profileData as MockRestaurantProfile).closingTime ?? '11:00 PM');
+
     setCuisineTypes(
       (profileData.cuisineTypes ?? []).filter((c): c is CuisineType =>
         (CUISINE_TYPES as readonly string[]).includes(c),
@@ -152,14 +161,6 @@ export function RestaurantProfileScreen({ navigation }: Props) {
     setLongitude(
       profileData.address?.longitude != null ? String(profileData.address.longitude) : '',
     );
-    import('@react-native-async-storage/async-storage').then(m => {
-      m.default.getItem('restaurant_auth_phone').then(pn => {
-        setPhone(pn || ((profileData as MockRestaurantProfile).phone ?? '+91 98765 43210'));
-      });
-    });
-    setEmail((profileData as MockRestaurantProfile).email ?? 'contact@foodierestaurant.com');
-    setOpeningTime((profileData as MockRestaurantProfile).openingTime ?? '11:00 AM');
-    setClosingTime((profileData as MockRestaurantProfile).closingTime ?? '11:00 PM');
     setAvatarUri(profileData.logoImageUrl ?? null);
     setCoverUri(profileData.coverImageUrl ?? null);
     setHydrated(true);
@@ -199,9 +200,10 @@ export function RestaurantProfileScreen({ navigation }: Props) {
       return;
     }
 
+    validated.value.description = `${validated.value.description || ''} [PHONE:${phone}] [OPEN:${openingTime}] [CLOSE:${closingTime}]`.trim();
+
     try {
       await updateProfile(validated.value).unwrap();
-      await import('@react-native-async-storage/async-storage').then(m => m.default.setItem('restaurant_auth_phone', phone));
       setToast({ message: 'Profile saved successfully.', variant: 'success' });
       setHydrated(false);
       void query.refetch();

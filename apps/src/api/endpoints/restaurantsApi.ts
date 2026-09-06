@@ -210,6 +210,14 @@ export const restaurantsApi = baseApi.injectEndpoints({
           ]
           : [{ type: 'Restaurant', id: 'LIST' }],
     }),
+    getDashboardSummary: builder.query<any, { dateFrom?: string; dateTo?: string } | void>({
+      query: (params) => ({
+        url: '/api/v1/restaurants/me/dashboard-summary',
+        params: params || undefined,
+      }),
+      transformResponse: (response: any) => response?.data || response,
+      providesTags: [{ type: 'Restaurant' as any, id: 'LIST' }],
+    }),
   }),
 });
 
@@ -223,4 +231,5 @@ export const {
   useUploadRestaurantDocumentMutation,
   useUploadRestaurantImagesMutation,
   useResubmitRestaurantMutation,
+  useGetDashboardSummaryQuery,
 } = restaurantsApi;

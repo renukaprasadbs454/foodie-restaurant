@@ -5,6 +5,7 @@ import {
   ScrollView,
   View,
   useWindowDimensions,
+  RefreshControl,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -21,6 +22,8 @@ import {
 import {
   useGetRestaurantProfileQuery,
   useGetRestaurantQuery,
+  useGetDashboardSummaryQuery,
+  useToggleRestaurantStatusMutation,
 } from '../../../api/endpoints/restaurantsApi';
 import { useGetRestaurantOrdersQuery, useTransitionOrderStatusMutation } from '../../../api/endpoints/ordersApi';
 import { useAppDispatch, useAppSelector } from '../../../store/hooks';
@@ -62,6 +65,11 @@ export function DashboardScreen({ navigation }: Props) {
       pollingInterval: 5000, // Poll every 5 seconds for real-time customer order updates without UI interruption
     },
   );
+
+  const summaryQuery = useGetDashboardSummaryQuery(undefined, {
+    skip: !storedRestaurantId,
+    refetchOnFocus: true,
+  });
 
   const [transitionStatus] = useTransitionOrderStatusMutation();
   const [dismissedAlertOrderIds, setDismissedAlertOrderIds] = useState<string[]>([]);
@@ -120,42 +128,64 @@ export function DashboardScreen({ navigation }: Props) {
         ? mockSummary.recentOrders
         : [];
 
-  const todayOrdersCount =
-    apiOrders && apiOrders.length > 0
-      ? apiOrders.length
-      : isUsingMock
-        ? mockSummary.todayOrdersCount
-        : 0;
+  const todayOrdersCount = summaryQuery.data
+    ? summaryQuery.data.todayOrdersCount
+    : isUsingMock
+      ? mockSummary.todayOrdersCount
+      : 0;
 
-  const pendingOrdersCount =
-    apiOrders && apiOrders.length > 0
-      ? apiOrders.filter((o) => ['CONFIRMED', 'PENDING'].includes(o.status)).length
-      : isUsingMock
-        ? mockSummary.pendingOrdersCount
-        : 0;
+  const pendingOrdersCount = summaryQuery.data
+    ? summaryQuery.data.pendingOrdersCount
+    : isUsingMock
+      ? mockSummary.pendingOrdersCount
+      : 0;
 
-  const completedOrdersCount =
-    apiOrders && apiOrders.length > 0
-      ? apiOrders.filter((o) =>
-        ['DELIVERED', 'COMPLETED', 'READY_FOR_PICKUP'].includes(o.status),
-      ).length
-      : isUsingMock
-        ? mockSummary.completedOrdersCount
-        : 0;
+  const completedOrdersCount = summaryQuery.data
+    ? summaryQuery.data.completedOrdersCount
+    : isUsingMock
+      ? mockSummary.completedOrdersCount
+      : 0;
 
-  const totalRevenue =
-    apiOrders && apiOrders.length > 0
-      ? apiOrders.reduce((acc, o) => {
-        const val = typeof o.totalAmount === 'number' ? o.totalAmount : Number(o.totalAmount) || 0;
-        return acc + val;
-      }, 0)
-      : isUsingMock
-        ? mockSummary.grossRevenue
-        : 0;
+  const totalRevenue = summaryQuery.data
+    ? (typeof summaryQuery.data.grossRevenue === 'number' ? summaryQuery.data.grossRevenue : Number(summaryQuery.data.grossRevenue) || 0)
+    : isUsingMock
+      ? mockSummary.grossRevenue
+      : 0;
 
   useEffect(() => {
     trackAnalyticsEvent('restaurant_dashboard_viewed');
   }, []);
+
+  const [toggleStatus] = useToggleRestaurantStatusMutation();
+
+  useEffect(() => {
+    if (!apiProfile) return;
+    const desc = apiProfile.description || '';
+    const openMatch = desc.match(/\[OPEN:(.*?)\]/);
+    const closeMatch = desc.match(/\[CLOSE:(.*?)\]/);
+    if (!openMatch || !closeMatch) return;
+
+    const parseTime = (t: string) => {
+      const match = t.match(/(\d+):(\d+)\s*(AM|PM)/i);
+      if (!match) return 0;
+      let [_, h, m, p] = match;
+      let hours = parseInt(h, 10);
+      if (p.toUpperCase() === 'PM' && hours < 12) hours += 12;
+      if (p.toUpperCase() === 'AM' && hours === 12) hours = 0;
+      return hours * 60 + parseInt(m, 10);
+    };
+
+    const now = new Date();
+    const currentMins = now.getHours() * 60 + now.getMinutes();
+
+    const openMins = parseTime(openMatch[1]);
+    const closeMins = parseTime(closeMatch[1]);
+
+    const shouldBeOpen = currentMins >= openMins && currentMins < closeMins;
+    if (apiProfile.isOpen !== shouldBeOpen) {
+      void toggleStatus(shouldBeOpen);
+    }
+  }, [apiProfile, toggleStatus]);
 
   // LOADING STATE
   const isProfileLoading = !storedRestaurantId && profileQuery.isLoading;
@@ -233,6 +263,15 @@ export function DashboardScreen({ navigation }: Props) {
           alignSelf: isWide ? 'center' : undefined,
           width: '100%',
         }}
+        refreshControl={
+          <RefreshControl
+            refreshing={activeQuery.isFetching || summaryQuery.isFetching}
+            onRefresh={() => {
+              void activeQuery.refetch();
+              void summaryQuery.refetch();
+            }}
+          />
+        }
       >
         {/* DEMO MODE BADGE (SUBTLE) */}
         {isUsingMock ? <DemoModeIndicator isMockActive={true} /> : null}
