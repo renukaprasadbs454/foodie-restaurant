@@ -130,25 +130,25 @@ export function DashboardScreen({ navigation }: Props) {
         : [];
 
   const todayOrdersCount = summaryQuery.data
-    ? summaryQuery.data.todayOrdersCount
+    ? (summaryQuery.data.totalOrders || 0)
     : isUsingMock
       ? mockSummary.todayOrdersCount
       : 0;
 
   const pendingOrdersCount = summaryQuery.data
-    ? summaryQuery.data.pendingOrdersCount
+    ? (summaryQuery.data.pendingOrders || 0)
     : isUsingMock
       ? mockSummary.pendingOrdersCount
       : 0;
 
   const completedOrdersCount = summaryQuery.data
-    ? summaryQuery.data.completedOrdersCount
+    ? (summaryQuery.data.completedOrders || 0)
     : isUsingMock
       ? mockSummary.completedOrdersCount
       : 0;
 
   const totalRevenue = summaryQuery.data
-    ? (typeof summaryQuery.data.grossRevenue === 'number' ? summaryQuery.data.grossRevenue : Number(summaryQuery.data.grossRevenue) || 0)
+    ? (typeof summaryQuery.data.grossSales === 'number' ? summaryQuery.data.grossSales : Number(summaryQuery.data.grossSales) || 0)
     : isUsingMock
       ? mockSummary.grossRevenue
       : 0;

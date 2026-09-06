@@ -244,7 +244,7 @@ export function RestaurantHeader({
                 }}
               >
                 <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' }}>
-                  {unreadCount > 9 ? '9+' : unreadCount}
+                  {unreadCount > 99 ? '99+' : unreadCount}
                 </Text>
               </View>
             )}
