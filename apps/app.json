@@ -43,6 +43,9 @@
             "DEFAULT"
           ]
         }
+      ],
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -60,11 +63,22 @@
           "photosPermission": "Allow Foodie Restaurant to upload logo and cover images."
         }
       ],
-      "expo-document-picker"
+      "expo-document-picker",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
     ],
     "extra": {
       "apiBaseUrl": "https://api.foodie.kwiko.org",
-      "wsUrl": "wss://api.foodie.kwiko.org/ws"
+      "wsUrl": "wss://api.foodie.kwiko.org/ws",
+      "eas": {
+        "projectId": "af06dc02-5eaf-4808-b684-3c53c7e30153"
+      }
     }
   }
 }
