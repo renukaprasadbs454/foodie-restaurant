@@ -18,10 +18,10 @@ import {
     useTheme,
 } from 'foodie-shared-rn';
 import {
-    useGetRestaurantEarningsQuery,
     useGetRestaurantSettlementsQuery,
     type RestaurantSettlement,
 } from '../../../api/endpoints/settlementsApi';
+import { useGetDashboardSummaryQuery } from '../../../api/endpoints/restaurantsApi';
 import type { ProfileStackParamList } from '../../../navigation/types';
 import { MOCK_CONFIG } from '../../../config/mockConfig';
 
@@ -69,7 +69,7 @@ export function SettlementHistoryScreen({ navigation }: Props) {
         refetchOnFocus: true,
     });
 
-    const earningsQuery = useGetRestaurantEarningsQuery(undefined, {
+    const summaryQuery = useGetDashboardSummaryQuery(undefined, {
         refetchOnFocus: true,
     });
 
@@ -77,29 +77,13 @@ export function SettlementHistoryScreen({ navigation }: Props) {
         trackAnalyticsEvent('restaurant_settlement_history_viewed');
     }, []);
 
-    const isUsingMock =
-        MOCK_CONFIG.ENABLE_MOCK_FALLBACK &&
-        (!isConnected ||
-            settlementsQuery.isError ||
-            !settlementsQuery.data ||
-            settlementsQuery.data.length === 0);
+    const settlements = settlementsQuery.data ?? [];
 
-    const settlements =
-        settlementsQuery.data && settlementsQuery.data.length > 0
-            ? settlementsQuery.data
-            : isUsingMock
-                ? MOCK_SETTLEMENTS
-                : [];
-
-    const earnings = earningsQuery.data ?? {
-        grossEarnings: settlements.reduce((acc, s) => acc + s.grossSales, 0),
-        netSettled: settlements
-            .filter((s) => s.status === 'DISBURSED')
-            .reduce((acc, s) => acc + s.netPayable, 0),
-        pendingPayout: settlements
-            .filter((s) => s.status === 'PENDING' || s.status === 'APPROVED')
-            .reduce((acc, s) => acc + s.netPayable, 0),
-        totalOrders: 42,
+    const earnings = {
+        grossEarnings: summaryQuery.data?.grossSales || 0,
+        netSettled: summaryQuery.data?.netEarnings || 0,
+        pendingPayout: 0,
+        totalOrders: summaryQuery.data?.totalOrders || 0,
         totalSettlements: settlements.length,
     };
 
@@ -128,10 +112,10 @@ export function SettlementHistoryScreen({ navigation }: Props) {
                 }}
                 refreshControl={
                     <RefreshControl
-                        refreshing={settlementsQuery.isFetching || earningsQuery.isFetching}
+                        refreshing={settlementsQuery.isFetching || summaryQuery.isFetching}
                         onRefresh={() => {
                             void settlementsQuery.refetch();
-                            void earningsQuery.refetch();
+                            void summaryQuery.refetch();
                         }}
                     />
                 }
@@ -190,7 +174,7 @@ export function SettlementHistoryScreen({ navigation }: Props) {
                     Settlement History ({settlements.length})
                 </Text>
 
-                {settlementsQuery.isLoading && !isUsingMock ? (
+                {settlementsQuery.isLoading ? (
                     <LoadingSpinner accessibilityLabel="Loading settlement history..." />
                 ) : settlements.length === 0 ? (
                     <EmptyState

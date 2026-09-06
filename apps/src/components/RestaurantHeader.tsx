@@ -7,6 +7,7 @@ import { selectRestaurantId } from '../features/onboarding/restaurantOnboardingS
 import { logoutRestaurant } from '../features/auth/session';
 import { store } from '../store/store';
 import { useGetRestaurantProfileQuery, useToggleRestaurantStatusMutation } from '../api/endpoints/restaurantsApi';
+import { useGetNotificationsQuery } from '../api/endpoints/notificationsApi';
 
 type Props = {
   title?: string;
@@ -36,6 +37,12 @@ export function RestaurantHeader({
   const { data: profile } = useGetRestaurantProfileQuery(undefined, { skip: !restaurantId });
   const [toggleStatus] = useToggleRestaurantStatusMutation();
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
+
+  const notificationsQuery = useGetNotificationsQuery(
+    { unreadOnly: true, page: 0, size: 50 },
+    { skip: !restaurantId, pollingInterval: 15000 }
+  );
+  const unreadCount = notificationsQuery.data?.length || 0;
 
   const isOnline = profile?.isOpen ?? false;
 
@@ -219,19 +226,28 @@ export function RestaurantHeader({
             }]}
           >
             <Text style={{ fontSize: 17 }}>🔔</Text>
-            <View
-              style={{
-                position: 'absolute',
-                top: 6,
-                right: 6,
-                width: 8,
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: BRAND_ACCENT,
-                borderWidth: 1.5,
-                borderColor: BRAND_PRIMARY,
-              }}
-            />
+            {unreadCount > 0 && (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: -2,
+                  right: -2,
+                  backgroundColor: '#EF4444',
+                  borderRadius: 10,
+                  paddingHorizontal: 4,
+                  minWidth: 16,
+                  height: 16,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 1.5,
+                  borderColor: BRAND_PRIMARY,
+                }}
+              >
+                <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </Text>
+              </View>
+            )}
           </Pressable>
 
           {/* PROFILE AVATAR CIRCLE */}

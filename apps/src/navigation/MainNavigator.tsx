@@ -13,7 +13,7 @@ import { RestaurantImagesScreen } from '../features/onboarding/screens/Restauran
 import { DashboardScreen } from '../features/orders/screens/DashboardScreen';
 import { IncomingOrdersScreen } from '../features/orders/screens/IncomingOrdersScreen';
 import { RestaurantOrderDetailsScreen } from '../features/orders/screens/RestaurantOrderDetailsScreen';
-import { NotificationsGapShellScreen } from '../features/notifications/screens/NotificationsGapShellScreen';
+import { NotificationsScreen } from '../features/notifications/screens/NotificationsScreen';
 import { BankAndBusinessDetailsScreen } from '../features/profile/screens/BankAndBusinessDetailsScreen';
 import { RestaurantLocationScreen } from '../features/profile/screens/RestaurantLocationScreen';
 import { RestaurantProfileScreen } from '../features/profile/screens/RestaurantProfileScreen';
@@ -158,7 +158,7 @@ function ProfileStackNavigator() {
       />
       <ProfileStack.Screen
         name="NotificationsHome"
-        component={NotificationsGapShellScreen}
+        component={NotificationsScreen}
         options={{ title: 'Notifications' }}
       />
     </ProfileStack.Navigator>

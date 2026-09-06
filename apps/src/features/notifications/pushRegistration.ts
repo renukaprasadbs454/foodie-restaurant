@@ -1,9 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 
 import Constants from 'expo-constants';
 
-const KEY = 'foodie.restaurant.pushRegistration.v1';
+if (Platform.OS === 'android') {
+  Notifications.setNotificationChannelAsync('default', {
+    name: 'default',
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 250, 250],
+  });
+}
+
+const KEY = 'foodie.customer.pushRegistration.v1';
 
 /** Avoid importing react-native here — keeps Jest/node suites loadable. */
 function isWebRuntime(): boolean {
@@ -115,7 +124,7 @@ export async function requestLocalPushRegistration(
   userId: string,
 ): Promise<LocalPushRegistration> {
   // Push device APIs are native-oriented; skip on web (GAP-API-01 / Expo Web limitation).
-  if (isWebRuntime() || isExpoGo()) {
+  if (isWebRuntime()) {
     const current = await loadLocalPushRegistration();
     const next: LocalPushRegistration = {
       ...current,
@@ -145,7 +154,7 @@ export async function requestLocalPushRegistration(
 export async function ensureLocalPushRegistration(
   userId: string,
 ): Promise<LocalPushRegistration> {
-  if (isWebRuntime() || isExpoGo()) {
+  if (isWebRuntime()) {
     return requestLocalPushRegistration(userId);
   }
 
