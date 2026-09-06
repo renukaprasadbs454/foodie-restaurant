@@ -18,7 +18,7 @@ export function OrderStatusBadge({ status, size = 'md' }: Props) {
     case 'CONFIRMED':
     case 'PENDING':
       tone = 'warning';
-      label = 'CONFIRMED';
+      label = 'PENDING';
       icon = '⏳';
       break;
     case 'ACCEPTED':
@@ -43,10 +43,14 @@ export function OrderStatusBadge({ status, size = 'md' }: Props) {
       icon = '✅';
       break;
     case 'REJECTED':
-    case 'CANCELLED':
       tone = 'error';
       label = 'REJECTED';
       icon = '❌';
+      break;
+    case 'CANCELLED':
+      tone = 'error';
+      label = 'CANCELLED';
+      icon = '🚫';
       break;
     default:
       tone = 'accent';

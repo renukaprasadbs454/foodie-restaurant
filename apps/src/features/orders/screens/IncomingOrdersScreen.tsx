@@ -48,11 +48,12 @@ const BRAND_ACCENT = '#F59E0B';  // Gold
 
 const STATUS_FILTERS = [
   { key: '', label: 'All Orders' },
-  { key: 'CONFIRMED', label: 'Confirmed' },
+  { key: 'CONFIRMED', label: 'Pending' },
   { key: 'ACCEPTED', label: 'Accepted' },
   { key: 'PREPARING', label: 'Preparing' },
   { key: 'READY_FOR_PICKUP', label: 'Ready for Pickup' },
   { key: 'DELIVERED', label: 'Delivered' },
+  { key: 'CANCELLED', label: 'Cancelled' },
   { key: 'REJECTED', label: 'Rejected' },
 ] as const;
 
@@ -82,6 +83,7 @@ export function IncomingOrdersScreen({ navigation }: Props) {
 
   // Local state for demo mode transitions
   const [localOrders, setLocalOrders] = useState<ExtendedOrderDetail[]>(MOCK_ORDERS);
+  const [manualRefresh, setManualRefresh] = useState(false);
 
   const [toast, setToast] = useState<{
     message: string;
@@ -294,9 +296,10 @@ export function IncomingOrdersScreen({ navigation }: Props) {
         }}
         refreshControl={
           <RefreshControl
-            refreshing={ordersQuery.isFetching}
+            refreshing={manualRefresh && ordersQuery.isFetching}
             onRefresh={() => {
-              void ordersQuery.refetch();
+              setManualRefresh(true);
+              void ordersQuery.refetch().then(() => setManualRefresh(false));
             }}
           />
         }
@@ -307,7 +310,7 @@ export function IncomingOrdersScreen({ navigation }: Props) {
         {/* HEADER SECTION */}
         <View style={{ gap: tokens.spacing.xs }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <View style={{ gap: 2 }}>
+            <View style={{ gap: 2, flex: 1 }}>
               <Text variant="heading1" style={{ color: BRAND_PRIMARY }} accessibilityRole="header">
                 Live Order Queue
               </Text>
@@ -315,15 +318,6 @@ export function IncomingOrdersScreen({ navigation }: Props) {
                 Manage incoming orders, prepare meals and track deliveries
               </Text>
             </View>
-
-            <Button
-              label="🔄 Refresh"
-              accessibilityLabel="Refresh orders"
-              variant="secondary"
-              loading={ordersQuery.isFetching}
-              onPress={() => void ordersQuery.refetch()}
-              style={{ height: 38 }}
-            />
           </View>
 
           {/* REAL-TIME CONNECTION INDICATORS & METRICS */}

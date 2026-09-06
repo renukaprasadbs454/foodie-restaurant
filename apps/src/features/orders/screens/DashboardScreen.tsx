@@ -66,7 +66,8 @@ export function DashboardScreen({ navigation }: Props) {
     },
   );
 
-  const summaryQuery = useGetDashboardSummaryQuery(undefined, {
+  const todayStr = React.useMemo(() => new Date().toISOString().split('T')[0], []);
+  const summaryQuery = useGetDashboardSummaryQuery({ dateFrom: todayStr, dateTo: todayStr }, {
     skip: !storedRestaurantId,
     refetchOnFocus: true,
   });
@@ -74,6 +75,7 @@ export function DashboardScreen({ navigation }: Props) {
   const [transitionStatus] = useTransitionOrderStatusMutation();
   const [dismissedAlertOrderIds, setDismissedAlertOrderIds] = useState<string[]>([]);
   const [rejectingOrder, setRejectingOrder] = useState<{ orderId: string; orderNumber: string } | null>(null);
+  const [manualRefresh, setManualRefresh] = useState(false);
 
   useEffect(() => {
     if (profileQuery.data?.restaurantId && !storedRestaurantId) {
@@ -265,10 +267,11 @@ export function DashboardScreen({ navigation }: Props) {
         }}
         refreshControl={
           <RefreshControl
-            refreshing={activeQuery.isFetching || summaryQuery.isFetching}
+            refreshing={manualRefresh && (activeQuery.isFetching || summaryQuery.isFetching)}
             onRefresh={() => {
-              void activeQuery.refetch();
-              void summaryQuery.refetch();
+              setManualRefresh(true);
+              void activeQuery.refetch().then(() => setManualRefresh(false));
+              void summaryQuery.refetch().then(() => setManualRefresh(false));
             }}
           />
         }
