@@ -1,0 +1,10 @@
+b251a34 Fix nested packages folder and metro config resolution
+24fbf59 Flatten foodie-restaurant app into apps/ mimicking customer repo
+7c787d2 feat: Add back to login button on RestaurantRegistrationScreen
+9cf5dd1 feat: connect admin panel to backend API, remove emojis, remove hardcoded data, and enable complete sidebar collapse
+b97b54f feat(frontend): configure delivery web bundling, metro aliases, tracking map, and shared packages
+daf93e9 feat: enhance customer flow and finalize restaurant onboarding
+5932219 Update README.md
+d2d4a65 Add restaurant project to apps/restaurant
+b35ef05 Revert ":wqRevert "feat(admin): connect Admin Panel to Spring Boot backend and implement multi-role RBAC""
+d13cebc :wqRevert "feat(admin): connect Admin Panel to Spring Boot backend and implement multi-role RBAC"

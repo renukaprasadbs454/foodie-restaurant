@@ -24,6 +24,8 @@ import { clearIsNewUser } from '../../auth/authSlice';
 import { toUnwrappedApiError } from '../../auth/apiError';
 import { OnboardingStepper } from '../components/OnboardingStepper';
 import { setRestaurantCreated } from '../restaurantOnboardingSlice';
+import { logoutRestaurant } from '../../auth/session';
+import { store } from '../../../store/store';
 import {
   CUISINE_TYPES,
   validateRegistrationForm,
@@ -467,6 +469,13 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
               Save & Proceed to Documents →
             </Text>
           )}
+        </Pressable>
+
+        <Pressable
+          onPress={() => void logoutRestaurant(dispatch, store.getState)}
+          style={{ alignItems: 'center', marginTop: 24, paddingVertical: 12 }}
+        >
+          <Text style={{ color: '#64748B', fontSize: 15, fontWeight: '700' }}>← Back to Login</Text>
         </Pressable>
       </ScrollView>
 
