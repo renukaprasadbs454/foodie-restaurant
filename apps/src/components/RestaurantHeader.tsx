@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Modal, Pressable, View, useWindowDimensions } from 'react-native';
+import React from 'react';
+import { Pressable, View, useWindowDimensions, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, useTheme } from 'foodie-shared-rn';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -36,7 +36,6 @@ export function RestaurantHeader({
   const dispatch = useAppDispatch();
   const { data: profile } = useGetRestaurantProfileQuery(undefined, { skip: !restaurantId });
   const [toggleStatus] = useToggleRestaurantStatusMutation();
-  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
 
   const notificationsQuery = useGetNotificationsQuery(
     { unreadOnly: true, page: 0, size: 20 },
@@ -52,36 +51,7 @@ export function RestaurantHeader({
 
   const canGoBack = showBack || (navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack());
 
-  const handleProfilePress = () => {
-    setIsMenuOpen(true);
-  };
 
-  const handleNavigateProfile = () => {
-    setIsMenuOpen(false);
-    if (navigation && typeof navigation.navigate === 'function') {
-      navigation.navigate('ProfileTab');
-    }
-  };
-
-  const handleNavigateSettings = () => {
-    setIsMenuOpen(false);
-    if (navigation && typeof navigation.navigate === 'function') {
-      navigation.navigate('ProfileTab');
-    }
-  };
-
-  const handleLogoutPress = async () => {
-    setIsMenuOpen(false);
-    if (onLogout) {
-      onLogout();
-    } else {
-      try {
-        await logoutRestaurant(dispatch, store.getState.bind(store));
-      } catch (e) {
-        console.error('Logout failed:', e);
-      }
-    }
-  };
 
   const handleNotificationPress = () => {
     if (navigation && typeof navigation.navigate === 'function') {
@@ -174,7 +144,20 @@ export function RestaurantHeader({
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.sm }}>
           {/* ONLINE / OFFLINE TOGGLE PILL */}
           <Pressable
-            onPress={() => toggleStatus(!isOnline)}
+            onPress={() => {
+              if (isOnline) {
+                Alert.alert(
+                  'Confirm Offline',
+                  'Are you sure you want to go offline? You will stop receiving new orders.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Confirm', style: 'destructive', onPress: () => toggleStatus(false) },
+                  ]
+                );
+              } else {
+                toggleStatus(true);
+              }
+            }}
             accessibilityRole="button"
             accessibilityLabel={`Restaurant status ${isOnline ? 'Online' : 'Offline'}`}
             style={({ pressed }) => [{
@@ -250,82 +233,8 @@ export function RestaurantHeader({
             )}
           </Pressable>
 
-          {/* PROFILE AVATAR CIRCLE */}
-          <Pressable
-            onPress={handleProfilePress}
-            accessibilityRole="button"
-            accessibilityLabel="Restaurant Profile Dropdown"
-            style={({ pressed }) => [{
-              width: 36,
-              height: 36,
-              borderRadius: 18,
-              backgroundColor: '#DCFCE7',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderWidth: 1.5,
-              borderColor: BRAND_ACCENT,
-              opacity: pressed ? 0.8 : 1,
-            }]}
-          >
-            <Text style={{ fontSize: 16 }}>👤</Text>
-          </Pressable>
         </View>
       </View>
-
-      {/* PROFILE DROPDOWN MODAL */}
-      <Modal
-        visible={isMenuOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsMenuOpen(false)}
-      >
-        <Pressable
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(0, 0, 0, 0.3)',
-            justifyContent: 'flex-start',
-            alignItems: 'flex-end',
-            paddingTop: 60,
-            paddingRight: 16,
-          }}
-          onPress={() => setIsMenuOpen(false)}
-        >
-          <View
-            style={{
-              width: 180,
-              backgroundColor: '#FFFFFF',
-              borderRadius: 12,
-              paddingVertical: 4,
-              borderWidth: 1,
-              borderColor: '#E2E8F0',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.15,
-              shadowRadius: 10,
-              elevation: 5,
-            }}
-          >
-            <Pressable
-              onPress={handleLogoutPress}
-              accessibilityRole="button"
-              accessibilityLabel="Log out option"
-              style={({ pressed }) => [{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 10,
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                backgroundColor: pressed ? '#FEF2F2' : 'transparent',
-              }]}
-            >
-              <Text style={{ fontSize: 16 }}>🚪</Text>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#EF4444' }}>
-                Log out
-              </Text>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Modal>
 
       {/* SUBTLE AMBER BOTTOM ACCENT LINE */}
       <View style={{ height: 2, backgroundColor: BRAND_ACCENT }} />

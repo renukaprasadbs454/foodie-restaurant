@@ -27,9 +27,11 @@ import { useRestaurantOrdersSubscription } from '../hooks/useRestaurantOrdersSub
 import {
   formatMoney,
   isOrderId,
+  isTerminalOrderStatus,
   restaurantActionsForStatus,
   type RestaurantTransitionStatus,
 } from '../types';
+import { OrderChat } from '../components/OrderChat';
 import type { OrdersStackParamList } from '../../../navigation/types';
 import { DemoModeIndicator } from '../../../components/DemoModeIndicator';
 import { MOCK_CONFIG } from '../../../config/mockConfig';
@@ -342,6 +344,11 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
                 </Text>
               </View>
             </Card>
+
+            {/* LIVE MESSAGE / CHAT OPTION */}
+            {order.status && !isTerminalOrderStatus(order.status) ? (
+              <OrderChat orderId={order.orderId} senderRole="RESTAURANT" />
+            ) : null}
 
             {/* KITCHEN ORDER ACTIONS CARD */}
             {actions.length > 0 ? (

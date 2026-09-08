@@ -357,19 +357,11 @@ export function DashboardScreen({ navigation }: Props) {
               <Text variant="caption" style={{ color: '#F87171' }}>
                 ⚠️ Offline — Demo data active.
               </Text>
-            ) : wsActive ? (
-              <Text variant="caption" style={{ color: '#86EFAC' }}>
-                ● Live order WebSocket connected
-              </Text>
             ) : isUsingMock ? (
               <Text variant="caption" style={{ color: '#FDE68A' }}>
                 ● Demo mode active (Mock data loaded)
               </Text>
-            ) : (
-              <Text variant="caption" style={{ color: '#9CA3AF' }}>
-                Polling order queue (45s)…
-              </Text>
-            )}
+            ) : null}
           </View>
         </Card>
 
@@ -381,108 +373,116 @@ export function DashboardScreen({ navigation }: Props) {
 
           {/* 2x2 Grid of Summary Cards */}
           <View style={{ flexDirection: 'row', gap: tokens.spacing.sm }}>
-            {/* Today's Orders */}
-            <Card
-              style={{
-                flex: 1,
-                padding: tokens.spacing.md,
-                borderRadius: 14,
-                borderLeftWidth: 4,
-                borderLeftColor: BRAND_PRIMARY,
-                gap: 4,
-              }}
-            >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text variant="caption" color={tokens.color.textSecondary}>
-                  Today's Orders
+            {/* My Earning Card */}
+            <Pressable style={{ flex: 1 }} onPress={() => navigation.getParent()?.navigate('ProfileTab', { screen: 'SettlementHistory' })}>
+              <Card
+                style={{
+                  height: '100%',
+                  padding: tokens.spacing.md,
+                  borderRadius: 14,
+                  borderLeftWidth: 4,
+                  borderLeftColor: BRAND_ACCENT,
+                  backgroundColor: '#FEF3C7',
+                  gap: 4,
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text variant="caption" style={{ color: '#92400E', fontWeight: 'bold' }}>
+                    My Earning
+                  </Text>
+                  <Text style={{ fontSize: 16 }}>💰</Text>
+                </View>
+                <Text variant="heading2" style={{ color: '#92400E', fontSize: 20, fontWeight: 'bold' }}>
+                  {formatMoney(totalRevenue)}
                 </Text>
-                <Text style={{ fontSize: 16 }}>📦</Text>
-              </View>
-              <Text variant="heading1" style={{ color: BRAND_PRIMARY, fontSize: 26, fontWeight: 'bold' }}>
-                {todayOrdersCount}
-              </Text>
-              <Text variant="caption" color={tokens.color.textSecondary}>
-                Total received today
-              </Text>
-            </Card>
+                <Text variant="caption" style={{ color: '#B45309' }}>
+                  Sales total
+                </Text>
+              </Card>
+            </Pressable>
 
-            {/* Pending Orders */}
-            <Card
-              style={{
-                flex: 1,
-                padding: tokens.spacing.md,
-                borderRadius: 14,
-                borderLeftWidth: 4,
-                borderLeftColor: BRAND_ACCENT,
-                gap: 4,
-              }}
-            >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text variant="caption" color={tokens.color.textSecondary}>
-                  Pending Orders
+            {/* Today's Orders */}
+            <Pressable style={{ flex: 1 }} onPress={() => navigation.getParent()?.navigate('OrdersTab')}>
+              <Card
+                style={{
+                  height: '100%',
+                  padding: tokens.spacing.md,
+                  borderRadius: 14,
+                  borderLeftWidth: 4,
+                  borderLeftColor: BRAND_PRIMARY,
+                  gap: 4,
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text variant="caption" color={tokens.color.textSecondary}>
+                    Today's Orders
+                  </Text>
+                  <Text style={{ fontSize: 16 }}>📦</Text>
+                </View>
+                <Text variant="heading1" style={{ color: BRAND_PRIMARY, fontSize: 26, fontWeight: 'bold' }}>
+                  {todayOrdersCount}
                 </Text>
-                <Text style={{ fontSize: 16 }}>⏳</Text>
-              </View>
-              <Text variant="heading1" style={{ color: BRAND_ACCENT, fontSize: 26, fontWeight: 'bold' }}>
-                {pendingOrdersCount}
-              </Text>
-              <Text variant="caption" style={{ color: BRAND_ACCENT, fontWeight: '600' }}>
-                Needs kitchen action
-              </Text>
-            </Card>
+                <Text variant="caption" color={tokens.color.textSecondary}>
+                  Total received today
+                </Text>
+              </Card>
+            </Pressable>
           </View>
 
           <View style={{ flexDirection: 'row', gap: tokens.spacing.sm }}>
-            {/* Completed Orders */}
-            <Card
-              style={{
-                flex: 1,
-                padding: tokens.spacing.md,
-                borderRadius: 14,
-                borderLeftWidth: 4,
-                borderLeftColor: '#16A34A',
-                gap: 4,
-              }}
-            >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text variant="caption" color={tokens.color.textSecondary}>
-                  Completed
+            {/* Pending Orders */}
+            <Pressable style={{ flex: 1 }} onPress={() => navigation.getParent()?.navigate('OrdersTab')}>
+              <Card
+                style={{
+                  height: '100%',
+                  padding: tokens.spacing.md,
+                  borderRadius: 14,
+                  borderLeftWidth: 4,
+                  borderLeftColor: BRAND_ACCENT,
+                  gap: 4,
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text variant="caption" color={tokens.color.textSecondary}>
+                    Pending Orders
+                  </Text>
+                  <Text style={{ fontSize: 16 }}>⏳</Text>
+                </View>
+                <Text variant="heading1" style={{ color: BRAND_ACCENT, fontSize: 26, fontWeight: 'bold' }}>
+                  {pendingOrdersCount}
                 </Text>
-                <Text style={{ fontSize: 16 }}>✅</Text>
-              </View>
-              <Text variant="heading1" style={{ color: '#16A34A', fontSize: 26, fontWeight: 'bold' }}>
-                {completedOrdersCount}
-              </Text>
-              <Text variant="caption" color={tokens.color.textSecondary}>
-                Dispatched & Served
-              </Text>
-            </Card>
+                <Text variant="caption" style={{ color: BRAND_ACCENT, fontWeight: '600' }}>
+                  Needs kitchen action
+                </Text>
+              </Card>
+            </Pressable>
 
-            {/* Revenue Card (Gold Highlight) */}
-            <Card
-              style={{
-                flex: 1,
-                padding: tokens.spacing.md,
-                borderRadius: 14,
-                borderLeftWidth: 4,
-                borderLeftColor: BRAND_ACCENT,
-                backgroundColor: '#FEF3C7',
-                gap: 4,
-              }}
-            >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text variant="caption" style={{ color: '#92400E', fontWeight: 'bold' }}>
-                  Gross Revenue
+            {/* Completed Orders */}
+            <Pressable style={{ flex: 1 }} onPress={() => navigation.getParent()?.navigate('OrdersTab')}>
+              <Card
+                style={{
+                  height: '100%',
+                  padding: tokens.spacing.md,
+                  borderRadius: 14,
+                  borderLeftWidth: 4,
+                  borderLeftColor: '#16A34A',
+                  gap: 4,
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text variant="caption" color={tokens.color.textSecondary}>
+                    Completed
+                  </Text>
+                  <Text style={{ fontSize: 16 }}>✅</Text>
+                </View>
+                <Text variant="heading1" style={{ color: '#16A34A', fontSize: 26, fontWeight: 'bold' }}>
+                  {completedOrdersCount}
                 </Text>
-                <Text style={{ fontSize: 16 }}>💰</Text>
-              </View>
-              <Text variant="heading2" style={{ color: '#92400E', fontSize: 20, fontWeight: 'bold' }}>
-                {formatMoney(totalRevenue)}
-              </Text>
-              <Text variant="caption" style={{ color: '#B45309' }}>
-                Sales total
-              </Text>
-            </Card>
+                <Text variant="caption" color={tokens.color.textSecondary}>
+                  Dispatched & Served
+                </Text>
+              </Card>
+            </Pressable>
           </View>
         </View>
 

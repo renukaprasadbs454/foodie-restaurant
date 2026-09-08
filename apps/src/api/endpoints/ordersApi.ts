@@ -47,12 +47,12 @@ export const ordersApi = baseApi.injectEndpoints({
       providesTags: (result) =>
         result
           ? [
-              ...result.map(({ orderId }) => ({
-                type: 'Order' as const,
-                id: orderId,
-              })),
-              { type: 'Order', id: 'LIST' },
-            ]
+            ...result.map(({ orderId }) => ({
+              type: 'Order' as const,
+              id: orderId,
+            })),
+            { type: 'Order', id: 'LIST' },
+          ]
           : [{ type: 'Order', id: 'LIST' }],
       keepUnusedDataFor: 45,
     }),
@@ -78,7 +78,27 @@ export const ordersApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, arg) => [
         { type: 'Order', id: arg.orderId },
-        { type: 'Order', id: 'LIST' },
+      ],
+    }),
+    getOrderMessages: builder.query<any[], string>({
+      query: (orderId) => `/api/v1/orders/${orderId}/messages`,
+      providesTags: (_result, _error, orderId) => [
+        { type: 'Order', id: orderId },
+      ],
+      keepUnusedDataFor: 0,
+    }),
+    sendOrderMessage: builder.mutation<
+      any,
+      { orderId: string; senderRole: string; messageText: string }
+    >({
+      query: ({ orderId, senderRole, messageText }) => ({
+        url: `/api/v1/orders/${orderId}/messages`,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: { senderRole, messageText },
+      }),
+      invalidatesTags: (_result, _error, arg) => [
+        { type: 'Order', id: arg.orderId },
       ],
     }),
   }),
@@ -88,4 +108,6 @@ export const {
   useGetRestaurantOrdersQuery,
   useGetOrderQuery,
   useTransitionOrderStatusMutation,
+  useGetOrderMessagesQuery,
+  useSendOrderMessageMutation,
 } = ordersApi;

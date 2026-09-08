@@ -158,24 +158,18 @@ export function OrderCard({
         }}
       >
         {detail ? (
-          <>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text variant="caption" color={tokens.color.textSecondary}>Items Total</Text>
-              <Text variant="caption" color={tokens.color.textPrimary}>{formatMoney(detail.subtotal)}</Text>
-            </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text variant="caption" color={tokens.color.textSecondary}>Tax</Text>
-              <Text variant="caption" color={tokens.color.textPrimary}>{formatMoney(detail.taxAmount)}</Text>
-            </View>
-          </>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Text variant="caption" color={tokens.color.textSecondary}>Food Charge</Text>
+            <Text variant="caption" color={tokens.color.textPrimary}>{formatMoney(detail.subtotal)}</Text>
+          </View>
         ) : null}
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
           <Text variant="label" style={{ color: BRAND_PRIMARY, fontSize: 14, fontWeight: 'bold' }}>
-            Grand Total
+            Total
           </Text>
           <Text variant="label" style={{ color: BRAND_PRIMARY, fontSize: 16, fontWeight: 'bold' }}>
-            {formatMoney(order.totalAmount)}
+            {detail ? formatMoney(detail.subtotal) : formatMoney(order.totalAmount)}
           </Text>
         </View>
       </View>
