@@ -377,7 +377,6 @@ export function DashboardScreen({ navigation }: Props) {
             <Pressable style={{ flex: 1 }} onPress={() => navigation.getParent()?.navigate('ProfileTab', { screen: 'SettlementHistory' })}>
               <Card
                 style={{
-                  height: '100%',
                   padding: tokens.spacing.md,
                   borderRadius: 14,
                   borderLeftWidth: 4,
@@ -405,7 +404,6 @@ export function DashboardScreen({ navigation }: Props) {
             <Pressable style={{ flex: 1 }} onPress={() => navigation.getParent()?.navigate('OrdersTab')}>
               <Card
                 style={{
-                  height: '100%',
                   padding: tokens.spacing.md,
                   borderRadius: 14,
                   borderLeftWidth: 4,
@@ -434,7 +432,6 @@ export function DashboardScreen({ navigation }: Props) {
             <Pressable style={{ flex: 1 }} onPress={() => navigation.getParent()?.navigate('OrdersTab')}>
               <Card
                 style={{
-                  height: '100%',
                   padding: tokens.spacing.md,
                   borderRadius: 14,
                   borderLeftWidth: 4,
@@ -461,7 +458,6 @@ export function DashboardScreen({ navigation }: Props) {
             <Pressable style={{ flex: 1 }} onPress={() => navigation.getParent()?.navigate('OrdersTab')}>
               <Card
                 style={{
-                  height: '100%',
                   padding: tokens.spacing.md,
                   borderRadius: 14,
                   borderLeftWidth: 4,
