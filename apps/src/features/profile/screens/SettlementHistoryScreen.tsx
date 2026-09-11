@@ -87,8 +87,9 @@ export function SettlementHistoryScreen({ navigation }: Props) {
     const settlements = settlementsQuery.data ?? [];
 
     const pending = earningsQuery.data?.data?.balance || 0;
-    const totalNetEarnings = summaryQuery.data?.netEarnings || 0;
-    const disbursed = Math.max(0, totalNetEarnings - pending);
+    const disbursed = settlements
+        .filter((s: RestaurantSettlement) => s.status === 'DISBURSED')
+        .reduce((sum, s) => sum + s.netPayable, 0);
 
     const earnings = {
         grossEarnings: summaryQuery.data?.grossSales || 0,
