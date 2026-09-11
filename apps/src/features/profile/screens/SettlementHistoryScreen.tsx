@@ -24,7 +24,7 @@ import {
 import { useGetDashboardSummaryQuery } from '../../../api/endpoints/restaurantsApi';
 import type { ProfileStackParamList } from '../../../navigation/types';
 import { MOCK_CONFIG } from '../../../config/mockConfig';
-import { RequestPayoutModal } from './components/RequestPayoutModal';
+import { RequestPayoutModal } from '../components/RequestPayoutModal';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'SettlementHistory'>;
 
