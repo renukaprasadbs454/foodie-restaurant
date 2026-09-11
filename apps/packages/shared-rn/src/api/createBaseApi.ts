@@ -102,6 +102,7 @@ export function createBaseApi<TagTypes extends string = string>(
         headers.set('Authorization', `Bearer ${String(token)}`);
       }
       headers.set('Accept', 'application/json');
+      headers.set('Bypass-Tunnel-Reminder', 'true');
       return headers;
     },
   });

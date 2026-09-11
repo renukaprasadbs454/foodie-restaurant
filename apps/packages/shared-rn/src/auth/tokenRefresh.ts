@@ -54,6 +54,7 @@ async function executeRefresh({
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
+        'Bypass-Tunnel-Reminder': 'true',
       },
       body: JSON.stringify({ refreshToken: String(refreshToken) }),
     });
