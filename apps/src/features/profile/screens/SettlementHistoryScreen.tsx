@@ -86,10 +86,14 @@ export function SettlementHistoryScreen({ navigation }: Props) {
 
     const settlements = settlementsQuery.data ?? [];
 
+    const pending = earningsQuery.data?.data?.balance || 0;
+    const totalNetEarnings = summaryQuery.data?.netEarnings || 0;
+    const disbursed = Math.max(0, totalNetEarnings - pending);
+
     const earnings = {
         grossEarnings: summaryQuery.data?.grossSales || 0,
-        netSettled: summaryQuery.data?.netEarnings || 0,
-        pendingPayout: earningsQuery.data?.data?.balance || 0,
+        netSettled: disbursed,
+        pendingPayout: pending,
         totalOrders: summaryQuery.data?.totalOrders || 0,
         totalSettlements: settlements.length,
     };
