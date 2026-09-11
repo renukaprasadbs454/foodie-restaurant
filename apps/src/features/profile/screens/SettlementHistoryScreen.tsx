@@ -24,6 +24,7 @@ import {
 import { useGetDashboardSummaryQuery } from '../../../api/endpoints/restaurantsApi';
 import type { ProfileStackParamList } from '../../../navigation/types';
 import { MOCK_CONFIG } from '../../../config/mockConfig';
+import { RequestPayoutModal } from './components/RequestPayoutModal';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'SettlementHistory'>;
 
@@ -64,6 +65,7 @@ const MOCK_SETTLEMENTS: RestaurantSettlement[] = [
 export function SettlementHistoryScreen({ navigation }: Props) {
     const { tokens } = useTheme();
     const { isConnected } = useConnectivity();
+    const [isPayoutModalOpen, setIsPayoutModalOpen] = React.useState(false);
 
     const settlementsQuery = useGetRestaurantSettlementsQuery(undefined, {
         refetchOnFocus: true,
@@ -167,6 +169,15 @@ export function SettlementHistoryScreen({ navigation }: Props) {
                             </Text>
                         </View>
                     </View>
+                    <View style={{ marginTop: 16 }}>
+                        <Button
+                            label="Request Payout"
+                            accessibilityLabel="Open Request Payout Modal"
+                            variant="primary"
+                            onPress={() => setIsPayoutModalOpen(true)}
+                            style={{ backgroundColor: '#22C55E', borderColor: '#22C55E' }}
+                        />
+                    </View>
                 </Card>
 
                 {/* Settlement Records Title */}
@@ -269,6 +280,12 @@ export function SettlementHistoryScreen({ navigation }: Props) {
                     ))
                 )}
             </ScrollView>
+
+            <RequestPayoutModal
+                visible={isPayoutModalOpen}
+                onClose={() => setIsPayoutModalOpen(false)}
+                availableBalance={earnings.pendingPayout}
+            />
         </SafeAreaView>
     );
 }

@@ -201,6 +201,8 @@ export function MenuItemsScreen({ navigation }: Props) {
   const [formPrepTime, setFormPrepTime] = useState<string>('15 min');
   const [formIsAvailable, setFormIsAvailable] = useState<boolean>(true);
   const [formImageUrl, setFormImageUrl] = useState<string | null>(null);
+  const [formPackageSize, setFormPackageSize] = useState<string>('');
+  const [formGstPct, setFormGstPct] = useState<string>('');
   const [formVariants, setFormVariants] = useState<MenuVariant[]>([]);
 
   // Variant input sub-state
@@ -366,6 +368,8 @@ export function MenuItemsScreen({ navigation }: Props) {
     setFormPrepTime('15 min');
     setFormIsAvailable(true);
     setFormImageUrl(null);
+    setFormPackageSize('');
+    setFormGstPct('');
     setFormVariants([]);
     setNewVariantName('');
     setNewVariantPriceDelta('');
@@ -385,6 +389,8 @@ export function MenuItemsScreen({ navigation }: Props) {
     setFormPrepTime(item.preparationTime);
     setFormIsAvailable(item.isAvailable);
     setFormImageUrl(item.imageUrl ?? null);
+    setFormPackageSize(item.packageSize ?? '');
+    setFormGstPct(item.gstPct !== null && item.gstPct !== undefined ? String(item.gstPct) : '');
     setFormVariants(item.variants ? [...item.variants] : []);
     setNewVariantName('');
     setNewVariantPriceDelta('');
@@ -459,6 +465,8 @@ export function MenuItemsScreen({ navigation }: Props) {
         preparationTime: formPrepTime,
         isAvailable: formIsAvailable,
         imageUrl: formImageUrl,
+        packageSize: formPackageSize || null,
+        gstPct: formGstPct ? Number(formGstPct) : null,
         variants: formVariants,
       };
 
@@ -478,6 +486,8 @@ export function MenuItemsScreen({ navigation }: Props) {
             description: formDescription.trim(),
             basePrice: priceNum,
             isVeg: formFoodType === 'VEG',
+            packageSize: formPackageSize,
+            gstPct: formGstPct ? Number(formGstPct) : null,
           }).unwrap();
 
           if (formImageUrl && !formImageUrl.startsWith('http')) {
@@ -510,6 +520,8 @@ export function MenuItemsScreen({ navigation }: Props) {
         imageUrl:
           formImageUrl ||
           'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80',
+        packageSize: formPackageSize || null,
+        gstPct: formGstPct ? Number(formGstPct) : null,
         rating: 5.0,
         variants: formVariants,
         createdAt: Date.now(),
@@ -528,6 +540,8 @@ export function MenuItemsScreen({ navigation }: Props) {
             description: formDescription.trim(),
             basePrice: priceNum,
             isVeg: formFoodType === 'VEG',
+            packageSize: formPackageSize,
+            gstPct: formGstPct ? Number(formGstPct) : null,
           }).unwrap();
 
           if (res?.menuItemId && formImageUrl && !formImageUrl.startsWith('http')) {
@@ -1188,6 +1202,49 @@ export function MenuItemsScreen({ navigation }: Props) {
                           }}
                         >
                           ⏱ {time}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+
+              {/* Package Size */}
+              <TextInput
+                label="Package Size (ml/L/kg)"
+                value={formPackageSize}
+                onChangeText={setFormPackageSize}
+                placeholder="e.g. 500ml, 1 Litre"
+                accessibilityLabel="Package Size"
+              />
+
+              {/* GST Percent */}
+              <View style={{ gap: tokens.spacing.xs }}>
+                <Text variant="label">GST (%) *</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                  {['0', '5', '12', '18', '36'].map((gst) => {
+                    const isSelected = formGstPct === gst;
+                    return (
+                      <Pressable
+                        key={gst}
+                        onPress={() => setFormGstPct(gst)}
+                        style={{
+                          paddingHorizontal: 16,
+                          paddingVertical: 8,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: isSelected ? BRAND_PRIMARY : '#CBD5E1',
+                          backgroundColor: isSelected ? BRAND_PRIMARY : '#F8FAFC',
+                        }}
+                      >
+                        <Text
+                          variant="caption"
+                          style={{
+                            color: isSelected ? '#FFFFFF' : '#334155',
+                            fontWeight: isSelected ? 'bold' : 'normal',
+                          }}
+                        >
+                          {gst}%
                         </Text>
                       </Pressable>
                     );

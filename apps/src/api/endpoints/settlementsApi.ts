@@ -16,6 +16,14 @@ export interface RestaurantSettlement {
     createdAt: string;
 }
 
+export interface PayoutRequestDto {
+    amount: number;
+    accountHolderName: string;
+    accountNumber: string;
+    ifscCode: string;
+    bankName: string;
+}
+
 export interface RestaurantEarningsSummary {
     grossEarnings: number;
     netSettled: number;
@@ -36,10 +44,20 @@ export const settlementsApi = baseApi.injectEndpoints({
             providesTags: [{ type: 'Restaurant', id: 'EARNINGS' }],
             keepUnusedDataFor: 60,
         }),
+        requestPayout: builder.mutation<{ success: boolean; data: any }, PayoutRequestDto>({
+            query: (body) => ({
+                url: '/api/v1/restaurants/me/wallet/payout-requests',
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body,
+            }),
+            invalidatesTags: [{ type: 'Restaurant', id: 'SETTLEMENTS' }, { type: 'Restaurant', id: 'EARNINGS' }],
+        }),
     }),
 });
 
 export const {
     useGetRestaurantSettlementsQuery,
     useGetRestaurantEarningsQuery,
+    useRequestPayoutMutation,
 } = settlementsApi;

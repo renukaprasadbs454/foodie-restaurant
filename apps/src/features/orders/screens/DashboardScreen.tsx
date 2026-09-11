@@ -147,10 +147,22 @@ export function DashboardScreen({ navigation }: Props) {
       ? mockSummary.completedOrdersCount
       : 0;
 
-  const totalRevenue = summaryQuery.data
-    ? (typeof summaryQuery.data.grossSales === 'number' ? summaryQuery.data.grossSales : Number(summaryQuery.data.grossSales) || 0)
+  const totalEarning = summaryQuery.data
+    ? (typeof summaryQuery.data.totalEarning === 'number' ? summaryQuery.data.totalEarning : Number(summaryQuery.data.totalEarning) || 0)
     : isUsingMock
       ? mockSummary.grossRevenue
+      : 0;
+
+  const commissionDeducted = summaryQuery.data
+    ? (typeof summaryQuery.data.commissionDeducted === 'number' ? summaryQuery.data.commissionDeducted : Number(summaryQuery.data.commissionDeducted) || 0)
+    : isUsingMock
+      ? (mockSummary.grossRevenue * 0.18)
+      : 0;
+
+  const netEarnings = summaryQuery.data
+    ? (typeof summaryQuery.data.netEarnings === 'number' ? summaryQuery.data.netEarnings : Number(summaryQuery.data.netEarnings) || 0)
+    : isUsingMock
+      ? (mockSummary.grossRevenue * 0.82)
       : 0;
 
   useEffect(() => {
@@ -158,35 +170,6 @@ export function DashboardScreen({ navigation }: Props) {
   }, []);
 
   const [toggleStatus] = useToggleRestaurantStatusMutation();
-
-  useEffect(() => {
-    if (!apiProfile) return;
-    const desc = apiProfile.description || '';
-    const openMatch = desc.match(/\[OPEN:(.*?)\]/);
-    const closeMatch = desc.match(/\[CLOSE:(.*?)\]/);
-    if (!openMatch || !closeMatch) return;
-
-    const parseTime = (t: string) => {
-      const match = t.match(/(\d+):(\d+)\s*(AM|PM)/i);
-      if (!match) return 0;
-      let [_, h, m, p] = match;
-      let hours = parseInt(h, 10);
-      if (p.toUpperCase() === 'PM' && hours < 12) hours += 12;
-      if (p.toUpperCase() === 'AM' && hours === 12) hours = 0;
-      return hours * 60 + parseInt(m, 10);
-    };
-
-    const now = new Date();
-    const currentMins = now.getHours() * 60 + now.getMinutes();
-
-    const openMins = parseTime(openMatch[1]);
-    const closeMins = parseTime(closeMatch[1]);
-
-    const shouldBeOpen = currentMins >= openMins && currentMins < closeMins;
-    if (apiProfile.isOpen !== shouldBeOpen) {
-      void toggleStatus(shouldBeOpen);
-    }
-  }, [apiProfile, toggleStatus]);
 
   // LOADING STATE
   const isProfileLoading = !storedRestaurantId && profileQuery.isLoading;
@@ -392,11 +375,15 @@ export function DashboardScreen({ navigation }: Props) {
                   <Text style={{ fontSize: 16 }}>💰</Text>
                 </View>
                 <Text variant="heading2" style={{ color: '#92400E', fontSize: 20, fontWeight: 'bold' }}>
-                  {formatMoney(totalRevenue)}
+                  {formatMoney(netEarnings)}
                 </Text>
                 <Text variant="caption" style={{ color: '#B45309' }}>
-                  Sales total
+                  Net (Credit Amount)
                 </Text>
+                <View style={{ marginTop: tokens.spacing.xs }}>
+                  <Text variant="caption" style={{ color: '#92400E' }}>Gross: {formatMoney(totalEarning)}</Text>
+                  <Text variant="caption" style={{ color: '#92400E' }}>Deduction: -{formatMoney(commissionDeducted)}</Text>
+                </View>
               </Card>
             </Pressable>
 

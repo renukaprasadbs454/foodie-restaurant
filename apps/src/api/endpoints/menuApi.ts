@@ -128,10 +128,12 @@ export const menuApi = baseApi.injectEndpoints({
     >({
       async queryFn(arg, _queryApi, _extraOptions, fetchWithBQ) {
         try {
-          const response = await fetch(arg.uri);
-          const blob = await response.blob();
           const formData = new FormData();
-          formData.append('file', blob, arg.fileName);
+          formData.append('file', {
+            uri: arg.uri,
+            type: arg.mimeType || 'image/jpeg',
+            name: arg.fileName,
+          } as any);
           const result = await fetchWithBQ({
             url: `/api/v1/menu/items/${arg.menuItemId}/image`,
             method: 'POST',

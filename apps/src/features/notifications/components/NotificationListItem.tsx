@@ -62,7 +62,7 @@ export function NotificationListItem({ notification, onPress }: Props) {
         </Text>
         {notification.sentAt ? (
           <Text style={{ color: '#9CA3AF', fontSize: 12, marginTop: 4, fontWeight: '500' }}>
-            {new Date(notification.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {new Date(notification.sentAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
           </Text>
         ) : null}
       </View>

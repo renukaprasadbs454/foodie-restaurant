@@ -27,6 +27,8 @@ export type MenuItem = {
   rating?: number;
   preparationTime?: string;
   createdAt?: number;
+  packageSize?: string | null;
+  gstPct?: number | string | null;
 };
 
 export type NormalizedMenuItem = {
@@ -44,6 +46,8 @@ export type NormalizedMenuItem = {
   preparationTime: string;
   variants: MenuVariant[];
   createdAt: number;
+  packageSize?: string | null;
+  gstPct?: number | null;
 };
 
 export function determineFoodType(
@@ -83,6 +87,8 @@ export function normalizeMenuItem(
     preparationTime: raw.preparationTime || '15 min',
     variants: Array.isArray(raw.variants) ? raw.variants : [],
     createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : Date.now(),
+    packageSize: raw.packageSize ?? null,
+    gstPct: typeof raw.gstPct === 'number' ? raw.gstPct : (raw.gstPct ? Number(raw.gstPct) : null),
   };
 }
 
@@ -109,6 +115,8 @@ export type CreateMenuItemRequest = {
   description?: string | null;
   basePrice: number;
   isVeg: boolean;
+  packageSize?: string | null;
+  gstPct?: number | null;
 };
 
 export type UpdateMenuItemRequest = {
@@ -118,6 +126,8 @@ export type UpdateMenuItemRequest = {
   description?: string | null;
   basePrice: number;
   isVeg: boolean;
+  packageSize?: string | null;
+  gstPct?: number | null;
 };
 
 export type AddVariantRequest = {
@@ -174,6 +184,8 @@ export function validateMenuItemForm(input: {
   description: string;
   basePrice: string;
   isVeg: boolean;
+  packageSize: string;
+  gstPct: string;
 }):
   | { ok: true; value: CreateMenuItemRequest }
   | { ok: false; message: string } {
@@ -204,6 +216,8 @@ export function validateMenuItemForm(input: {
       description: description || null,
       basePrice: rounded,
       isVeg: input.isVeg,
+      packageSize: input.packageSize.trim() || null,
+      gstPct: input.gstPct ? Number(input.gstPct) : 0,
     },
   };
 }
