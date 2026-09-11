@@ -34,13 +34,13 @@ export interface RestaurantEarningsSummary {
 
 export const settlementsApi = baseApi.injectEndpoints({
     endpoints: (builder) => ({
-        getRestaurantSettlements: builder.query<RestaurantSettlement[], void>({
-            query: () => '/api/v1/restaurants/me/settlements',
+        getRestaurantSettlements: builder.query<any, void>({
+            query: () => '/api/v1/restaurants/me/wallet/ledger',
             providesTags: [{ type: 'Restaurant', id: 'SETTLEMENTS' }],
             keepUnusedDataFor: 60,
         }),
-        getRestaurantEarnings: builder.query<RestaurantEarningsSummary, void>({
-            query: () => '/api/v1/restaurants/me/earnings',
+        getRestaurantEarnings: builder.query<any, void>({
+            query: () => '/api/v1/restaurants/me/wallet/balance',
             providesTags: [{ type: 'Restaurant', id: 'EARNINGS' }],
             keepUnusedDataFor: 60,
         }),

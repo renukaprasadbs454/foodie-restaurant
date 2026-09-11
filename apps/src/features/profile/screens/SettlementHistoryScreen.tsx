@@ -19,6 +19,7 @@ import {
 } from 'foodie-shared-rn';
 import {
     useGetRestaurantSettlementsQuery,
+    useGetRestaurantEarningsQuery,
     type RestaurantSettlement,
 } from '../../../api/endpoints/settlementsApi';
 import { useGetDashboardSummaryQuery } from '../../../api/endpoints/restaurantsApi';
@@ -75,6 +76,10 @@ export function SettlementHistoryScreen({ navigation }: Props) {
         refetchOnFocus: true,
     });
 
+    const earningsQuery = useGetRestaurantEarningsQuery(undefined, {
+        refetchOnFocus: true,
+    });
+
     React.useEffect(() => {
         trackAnalyticsEvent('restaurant_settlement_history_viewed');
     }, []);
@@ -84,7 +89,7 @@ export function SettlementHistoryScreen({ navigation }: Props) {
     const earnings = {
         grossEarnings: summaryQuery.data?.grossSales || 0,
         netSettled: summaryQuery.data?.netEarnings || 0,
-        pendingPayout: 0,
+        pendingPayout: earningsQuery.data?.data?.balance || 0,
         totalOrders: summaryQuery.data?.totalOrders || 0,
         totalSettlements: settlements.length,
     };
@@ -114,10 +119,11 @@ export function SettlementHistoryScreen({ navigation }: Props) {
                 }}
                 refreshControl={
                     <RefreshControl
-                        refreshing={settlementsQuery.isFetching || summaryQuery.isFetching}
+                        refreshing={settlementsQuery.isFetching || summaryQuery.isFetching || earningsQuery.isFetching}
                         onRefresh={() => {
                             void settlementsQuery.refetch();
                             void summaryQuery.refetch();
+                            void earningsQuery.refetch();
                         }}
                     />
                 }
@@ -194,7 +200,7 @@ export function SettlementHistoryScreen({ navigation }: Props) {
                         accessibilityLabel="No Settlements Recorded"
                     />
                 ) : (
-                    settlements.map((item) => (
+                    settlements.map((item: RestaurantSettlement) => (
                         <Card
                             key={item.id}
                             style={{
