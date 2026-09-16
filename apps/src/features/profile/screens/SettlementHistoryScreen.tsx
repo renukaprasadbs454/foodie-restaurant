@@ -86,7 +86,8 @@ export function SettlementHistoryScreen({ navigation }: Props) {
 
     const settlements = settlementsQuery.data ?? [];
 
-    const pending = earningsQuery.data?.data?.balance || 0;
+    // Safely parse balance regardless of RTK Query envelope stripping.
+    const pending = earningsQuery.data?.balance ?? earningsQuery.data?.data?.balance ?? 0;
     const disbursed = settlements
         .filter((s: RestaurantSettlement) => s.status === 'DISBURSED')
         .reduce((sum, s) => sum + s.netPayable, 0);

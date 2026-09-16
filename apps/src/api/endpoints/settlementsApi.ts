@@ -36,11 +36,13 @@ export const settlementsApi = baseApi.injectEndpoints({
     endpoints: (builder) => ({
         getRestaurantSettlements: builder.query<any, void>({
             query: () => '/api/v1/restaurants/me/wallet/ledger',
+            transformResponse: (response: any) => response?.data || response,
             providesTags: [{ type: 'Restaurant', id: 'SETTLEMENTS' }],
             keepUnusedDataFor: 60,
         }),
         getRestaurantEarnings: builder.query<any, void>({
             query: () => '/api/v1/restaurants/me/wallet/balance',
+            transformResponse: (response: any) => response?.data || response,
             providesTags: [{ type: 'Restaurant', id: 'EARNINGS' }],
             keepUnusedDataFor: 60,
         }),
