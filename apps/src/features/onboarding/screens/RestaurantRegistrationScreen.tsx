@@ -98,24 +98,51 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
         setFetchingLocation(false);
         return;
       }
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      const latStr = loc.coords.latitude.toString();
-      const lngStr = loc.coords.longitude.toString();
-      setLatitude(latStr);
-      setLongitude(lngStr);
-      setMapRegion(prev => ({ ...prev, latitude: loc.coords.latitude, longitude: loc.coords.longitude }));
 
-      const geocode = await Location.reverseGeocodeAsync({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-      if (geocode.length > 0) {
-        const addr = geocode[0];
-        if (addr.city) setCity(addr.city);
-        if (addr.postalCode) setPincode(addr.postalCode);
-        if (addr.street) setLine1(addr.street);
-        if (addr.name && addr.name !== addr.street) setLine2(addr.name);
+      let loc;
+      try {
+        loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      } catch (err) {
+        loc = await Location.getLastKnownPositionAsync();
       }
-      setToast({ message: 'Exact location fetched!', variant: 'success' });
+
+      if (!loc) {
+        throw new Error('Could not fetch location');
+      }
+
+      const lat = loc.coords.latitude;
+      const lng = loc.coords.longitude;
+
+      setLatitude(lat.toString());
+      setLongitude(lng.toString());
+
+      const newRegion = {
+        latitude: lat,
+        longitude: lng,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      };
+      setMapRegion(newRegion);
+
+      if (mapRef.current && mapRef.current.animateToRegion) {
+        mapRef.current.animateToRegion(newRegion, 1000);
+      }
+
+      try {
+        const geocode = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+        if (geocode.length > 0) {
+          const addr = geocode[0];
+          if (addr.city) setCity(addr.city);
+          if (addr.postalCode) setPincode(addr.postalCode);
+          if (addr.street) setLine1(addr.street);
+          if (addr.name && addr.name !== addr.street) setLine2(addr.name);
+        }
+        setToast({ message: 'Exact location fetched!', variant: 'success' });
+      } catch (e) {
+        setToast({ message: 'Location fetched, but address parsing failed.', variant: 'warning' });
+      }
     } catch {
-      setToast({ message: 'Failed to fetch GPS location.', variant: 'warning' });
+      setToast({ message: 'Failed to fetch GPS location.', variant: 'error' });
     } finally {
       setFetchingLocation(false);
     }
@@ -134,6 +161,8 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
 
   useEffect(() => {
     trackAnalyticsEvent('restaurant_registration_viewed');
+    void fetchExactLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const toggleCuisine = (cuisine: CuisineType) => {

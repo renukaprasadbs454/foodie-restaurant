@@ -166,34 +166,25 @@ export const restaurantsApi = baseApi.injectEndpoints({
         fileObj?: any;
       }
     >({
-      async queryFn(arg, _queryApi, _extraOptions, fetchWithBQ) {
-        try {
-          const formData = new FormData();
-          formData.append('imageType', arg.imageType);
-
-          if (Platform.OS === 'web') {
-            const response = await fetch(arg.uri);
-            const blob = await response.blob();
-            formData.append('file', blob, arg.fileName);
-          } else {
-            formData.append('file', {
-              uri: arg.uri,
-              type: arg.mimeType,
-              name: arg.fileName,
-            } as any);
-          }
-
-          const result = await fetchWithBQ({
-            url: '/api/v1/restaurants/me/images',
-            method: 'POST',
-            body: formData,
-          });
-          if (result.error) return { error: result.error };
-          return { data: (result.data as any)?.data || result.data };
-        } catch (e: any) {
-          return { error: { status: 'FETCH_ERROR', error: e.message } as any };
+      query: ({ imageType, uri, mimeType, fileName, fileObj }) => {
+        const formData = new FormData();
+        formData.append('imageType', imageType);
+        if (fileObj) {
+          formData.append('file', fileObj);
+        } else {
+          formData.append('file', {
+            uri,
+            type: mimeType,
+            name: fileName,
+          } as unknown as Blob);
         }
+        return {
+          url: '/api/v1/restaurants/me/images',
+          method: 'POST',
+          body: formData,
+        };
       },
+      transformResponse: (response: any) => response?.data || response,
       invalidatesTags: [{ type: 'Restaurant', id: 'LIST' }],
     }),
     resubmitRestaurant: builder.mutation<RestaurantDetail, void>({

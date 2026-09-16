@@ -88,12 +88,14 @@ export function PendingApprovalScreen({ navigation }: Props) {
             <View style={{ flex: 1, gap: 4 }}>
               <Text style={styles.headerBadge}>APPLICATION STATUS</Text>
               <Text style={styles.headerTitle}>
-                {status === 'REJECTED' ? 'Action Required' : 'Approval Progress'}
+                {status === 'REJECTED' ? 'Action Required' : status === 'APPROVED' ? 'Approved' : 'Approval Progress'}
               </Text>
               <Text style={styles.headerSubtitle}>
                 {status === 'REJECTED'
                   ? 'Update your submission to proceed'
-                  : 'Verification team is reviewing your documents'}
+                  : status === 'APPROVED'
+                    ? 'Your restaurant application has been approved'
+                    : 'Verification team is reviewing your documents'}
               </Text>
             </View>
             <View style={styles.iconCircle}>
@@ -105,7 +107,7 @@ export function PendingApprovalScreen({ navigation }: Props) {
         </View>
 
         {/* Stepper */}
-        <OnboardingStepper activeIndex={3} />
+        {status !== 'APPROVED' ? <OnboardingStepper activeIndex={3} /> : null}
 
         {!isConnected ? (
           <View style={styles.offlineBanner}>

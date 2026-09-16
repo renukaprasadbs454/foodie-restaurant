@@ -52,6 +52,8 @@ export function RestaurantDocumentsScreen({ navigation }: Props) {
     onGeneric: (error) => setToast({ message: error.message, variant: 'error' }),
   });
 
+  const allUploaded = DOC_TYPES.every(type => uploadedTypes[type]);
+
   useEffect(() => {
     trackAnalyticsEvent('restaurant_documents_viewed');
   }, []);
@@ -177,23 +179,21 @@ export function RestaurantDocumentsScreen({ navigation }: Props) {
             style={({ pressed }) => [
               styles.secondaryButton,
               pressed && styles.secondaryButtonPressed,
+              !allUploaded && styles.buttonDisabled,
             ]}
-            onPress={() => navigation.navigate('RestaurantImages')}
+            onPress={() => {
+              if (allUploaded) {
+                navigation.navigate('RestaurantImages');
+              } else {
+                setToast({
+                  message: 'Please upload all compliance documents before proceeding.',
+                  variant: 'warning',
+                });
+              }
+            }}
           >
             <Text style={styles.secondaryButtonText}>
               Proceed to Images →
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.textButton,
-              pressed && styles.textButtonPressed,
-            ]}
-            onPress={() => navigation.navigate('PendingApproval')}
-          >
-            <Text style={styles.textButtonText}>
-              Skip to Approval Status
             </Text>
           </Pressable>
         </View>
