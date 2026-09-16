@@ -2,18 +2,14 @@ import { baseApi } from '../baseApi';
 
 export interface RestaurantSettlement {
     id: string;
-    restaurantId: string;
-    settlementNumber: string;
-    settlementPeriodStart: string;
-    settlementPeriodEnd: string;
-    grossSales: number;
-    commissionAmount: number;
-    taxDeducted: number;
-    netPayable: number;
-    status: 'PENDING' | 'APPROVED' | 'DISBURSED' | 'FAILED';
-    paymentReference?: string;
-    disbursedAt?: string;
+    amount: number;
+    entryType: 'CREDIT' | 'DEBIT';
+    referenceType: string;
+    referenceId: string;
+    description?: string;
     createdAt: string;
+    // Client-side computed properties for legacy UI support if needed
+    status?: 'COMPLETED' | 'REQUESTED';
 }
 
 export interface PayoutRequestDto {

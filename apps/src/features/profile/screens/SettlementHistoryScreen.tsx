@@ -32,36 +32,47 @@ type Props = NativeStackScreenProps<ProfileStackParamList, 'SettlementHistory'>;
 const BRAND_PRIMARY = '#14532D';
 const BRAND_ACCENT = '#F59E0B';
 
-const MOCK_SETTLEMENTS: RestaurantSettlement[] = [
-    {
-        id: 'mock-set-1',
-        restaurantId: 'mock-rest-1',
-        settlementNumber: 'SETTLE-889201',
-        settlementPeriodStart: '2026-08-01T00:00:00Z',
-        settlementPeriodEnd: '2026-08-15T23:59:59Z',
-        grossSales: 34500,
-        commissionAmount: 5175,
-        taxDeducted: 345,
-        netPayable: 28980,
-        status: 'DISBURSED',
-        paymentReference: 'UTR-9920148201',
-        disbursedAt: '2026-08-16T10:30:00Z',
-        createdAt: '2026-08-16T00:00:00Z',
-    },
-    {
-        id: 'mock-set-2',
-        restaurantId: 'mock-rest-1',
-        settlementNumber: 'SETTLE-889202',
-        settlementPeriodStart: '2026-08-16T00:00:00Z',
-        settlementPeriodEnd: '2026-08-28T23:59:59Z',
-        grossSales: 18200,
-        commissionAmount: 2730,
-        taxDeducted: 182,
-        netPayable: 15288,
-        status: 'PENDING',
-        createdAt: '2026-08-28T00:00:00Z',
-    },
-];
+// Component uses live data exclusively
+
+const PayoutProgressBar = ({ status }: { status?: string }) => {
+    let step = 0;
+    if (status === 'PROCESSING') step = 1;
+    if (status === 'COMPLETED') step = 2;
+    if (status === 'FAILED') step = -1;
+
+    const steps = [
+        { label: 'Requested', isActive: step >= 0, isError: false },
+        { label: 'Processing', isActive: step >= 1, isError: false },
+        { label: 'Bank Credit', isActive: step >= 2, isError: step === -1 },
+    ];
+
+    if (step === -1) {
+        steps[2].label = 'Failed';
+        steps[2].isActive = true;
+    }
+
+    return (
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 4, paddingHorizontal: 4 }}>
+            {steps.map((s, idx) => (
+                <React.Fragment key={idx}>
+                    <View style={{ alignItems: 'center', flex: 1, zIndex: 1 }}>
+                        <View style={{
+                            width: 14, height: 14, borderRadius: 7,
+                            backgroundColor: s.isError ? '#DC2626' : (s.isActive ? '#14532D' : '#E2E8F0'),
+                            borderWidth: 2, borderColor: '#FFFFFF',
+                        }} />
+                        <Text variant="caption" style={{ fontSize: 10, marginTop: 4, color: s.isError ? '#DC2626' : (s.isActive ? '#14532D' : '#94A3B8'), textAlign: 'center', fontWeight: s.isActive ? 'bold' : 'normal' }}>
+                            {s.label}
+                        </Text>
+                    </View>
+                    {idx < steps.length - 1 && (
+                        <View style={{ flex: 1.5, height: 2, backgroundColor: steps[idx + 1].isActive ? (steps[idx + 1].isError ? '#DC2626' : '#14532D') : '#E2E8F0', marginHorizontal: -12, zIndex: 0 }} />
+                    )}
+                </React.Fragment>
+            ))}
+        </View>
+    );
+};
 
 export function SettlementHistoryScreen({ navigation }: Props) {
     const { tokens } = useTheme();
@@ -89,8 +100,8 @@ export function SettlementHistoryScreen({ navigation }: Props) {
     // Safely parse balance regardless of RTK Query envelope stripping.
     const pending = earningsQuery.data?.balance ?? earningsQuery.data?.data?.balance ?? 0;
     const disbursed = settlements
-        .filter((s: RestaurantSettlement) => s.status === 'DISBURSED')
-        .reduce((sum, s) => sum + s.netPayable, 0);
+        .filter((s: RestaurantSettlement) => s.entryType === 'DEBIT')
+        .reduce((sum, s) => sum + s.amount, 0);
 
     const earnings = {
         grossEarnings: summaryQuery.data?.grossSales || 0,
@@ -100,19 +111,10 @@ export function SettlementHistoryScreen({ navigation }: Props) {
         totalSettlements: settlements.length,
     };
 
-    const getStatusBadge = (status: RestaurantSettlement['status']) => {
-        switch (status) {
-            case 'DISBURSED':
-                return <Badge label="DISBURSED" tone="success" accessibilityLabel="Disbursed status" />;
-            case 'APPROVED':
-                return <Badge label="APPROVED" tone="accent" accessibilityLabel="Approved status" />;
-            case 'PENDING':
-                return <Badge label="PROCESSING" tone="warning" accessibilityLabel="Processing status" />;
-            case 'FAILED':
-                return <Badge label="FAILED" tone="error" accessibilityLabel="Failed status" />;
-            default:
-                return <Badge label={String(status)} tone="neutral" accessibilityLabel="Status" />;
-        }
+    const getStatusBadge = (entryType: RestaurantSettlement['entryType'], status: RestaurantSettlement['status']) => {
+        if (entryType === 'CREDIT') return <Badge label="EARNED" tone="success" accessibilityLabel="Credit Earned" />;
+        if (entryType === 'DEBIT' && status === 'REQUESTED') return <Badge label="PROCESSING" tone="warning" accessibilityLabel="Processing status" />;
+        return <Badge label="SETTLED" tone="neutral" accessibilityLabel="Settled status" />;
     };
 
     return (
@@ -220,72 +222,40 @@ export function SettlementHistoryScreen({ navigation }: Props) {
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <View>
                                     <Text variant="label" style={{ fontWeight: 'bold' }}>
-                                        {item.settlementNumber}
+                                        {item.referenceType === 'ORDER_EARNING' ? 'Order Payment' : 'Payout Disbursed'}
                                     </Text>
                                     <Text variant="caption" color={tokens.color.textSecondary}>
-                                        {new Date(item.settlementPeriodStart).toLocaleDateString()} -{' '}
-                                        {new Date(item.settlementPeriodEnd).toLocaleDateString()}
+                                        {new Date(item.createdAt).toLocaleString()}
                                     </Text>
                                 </View>
-                                {getStatusBadge(item.status)}
+                                {getStatusBadge(item.entryType, item.status)}
                             </View>
 
                             <View style={{ height: 1, backgroundColor: '#F1F5F9', marginVertical: 4 }} />
 
-                            {/* Financial Breakdown Table */}
                             <View style={{ gap: 4 }}>
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                                     <Text variant="caption" color={tokens.color.textSecondary}>
-                                        Gross Sales
+                                        {item.entryType === 'CREDIT' ? 'Transaction Value' : 'Withdrawal Amount'}
                                     </Text>
-                                    <Text variant="caption" style={{ fontWeight: '500' }}>
-                                        ₹{item.grossSales.toFixed(2)}
-                                    </Text>
-                                </View>
-
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                    <Text variant="caption" color={tokens.color.textSecondary}>
-                                        Platform Commission (15%)
-                                    </Text>
-                                    <Text variant="caption" style={{ color: '#DC2626' }}>
-                                        -₹{item.commissionAmount.toFixed(2)}
-                                    </Text>
-                                </View>
-
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                    <Text variant="caption" color={tokens.color.textSecondary}>
-                                        TDS Deducted (1%)
-                                    </Text>
-                                    <Text variant="caption" style={{ color: '#DC2626' }}>
-                                        -₹{item.taxDeducted.toFixed(2)}
-                                    </Text>
-                                </View>
-
-                                <View
-                                    style={{
-                                        flexDirection: 'row',
-                                        justifyContent: 'space-between',
-                                        marginTop: 4,
-                                        paddingTop: 4,
-                                        borderTopWidth: 1,
-                                        borderTopColor: '#F1F5F9',
-                                    }}
-                                >
-                                    <Text variant="label" style={{ color: BRAND_PRIMARY, fontWeight: 'bold' }}>
-                                        Net Payable
-                                    </Text>
-                                    <Text variant="heading3" style={{ color: BRAND_PRIMARY }}>
-                                        ₹{item.netPayable.toFixed(2)}
+                                    <Text variant="heading3" style={{ color: item.entryType === 'CREDIT' ? '#4ADE80' : '#EF4444' }}>
+                                        {item.entryType === 'CREDIT' ? '+' : '-'}₹{item.amount.toFixed(2)}
                                     </Text>
                                 </View>
                             </View>
 
-                            {item.paymentReference && (
+                            {item.referenceId && (
                                 <View style={{ backgroundColor: '#F8FAFC', padding: 8, borderRadius: 6, marginTop: 4 }}>
                                     <Text variant="caption" style={{ color: '#475569', fontSize: 11 }}>
-                                        Bank Ref: {item.paymentReference}{' '}
-                                        {item.disbursedAt && `• ${new Date(item.disbursedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                                        Ref: {item.referenceId}
                                     </Text>
+                                </View>
+                            )}
+
+                            {item.entryType === 'DEBIT' && (
+                                <View style={{ backgroundColor: '#F0FDF4', padding: 8, borderRadius: 8, marginTop: 8 }}>
+                                    <Text variant="caption" style={{ fontWeight: 'bold', color: '#166534', marginBottom: 4 }}>Payout Tracker</Text>
+                                    <PayoutProgressBar status={item.status || 'REQUESTED'} />
                                 </View>
                             )}
                         </Card>
