@@ -182,6 +182,7 @@ export const restaurantsApi = baseApi.injectEndpoints({
           url: '/api/v1/restaurants/me/images',
           method: 'POST',
           body: formData,
+          responseHandler: 'text',
         };
       },
       transformResponse: (response: any) => response?.data || response,

@@ -42,6 +42,8 @@ import { toUnwrappedApiError } from '../../auth/apiError';
 import { RestaurantProfileSkeleton } from '../components/RestaurantProfileSkeleton';
 import { validateProfileForm } from '../types';
 import type { ProfileStackParamList } from '../../../navigation/types';
+import { logoutRestaurant } from '../../auth/session';
+import { store } from '../../../store/store';
 import { DemoModeIndicator } from '../../../components/DemoModeIndicator';
 import { MOCK_CONFIG } from '../../../config/mockConfig';
 import { getMockRestaurantProfile, type MockRestaurantProfile } from '../../../mock';
@@ -630,7 +632,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
 
               <View style={{ flexDirection: 'row', gap: tokens.spacing.xs, flexWrap: 'wrap' }}>
                 <Button
-                  label="🏦 Bank & Business"
+                  label="🏦 Bank Account Details"
                   accessibilityLabel="Open Bank and Business Details"
                   variant="secondary"
                   style={{ borderColor: BRAND_ACCENT }}
@@ -657,7 +659,6 @@ export function RestaurantProfileScreen({ navigation }: Props) {
               </View>
             </Card>
 
-            {/* SAVE BUTTON */}
             <Button
               label="Save Restaurant Profile"
               accessibilityLabel="Save profile"
@@ -666,6 +667,16 @@ export function RestaurantProfileScreen({ navigation }: Props) {
               onPress={() => {
                 void onSave();
               }}
+            />
+
+            {/* LOGOUT BUTTON */}
+            <Button
+              label="Logout"
+              accessibilityLabel="Logout"
+              variant="secondary"
+              style={{ borderColor: '#DC2626' }}
+              textStyle={{ color: '#DC2626' }}
+              onPress={() => void logoutRestaurant(dispatch, store.getState)}
             />
           </>
         )}

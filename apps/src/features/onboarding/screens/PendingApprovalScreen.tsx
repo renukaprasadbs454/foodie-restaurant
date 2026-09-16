@@ -204,43 +204,45 @@ export function PendingApprovalScreen({ navigation }: Props) {
         )}
 
         {/* Action Options */}
-        <View style={styles.actionSection}>
-          <Text style={styles.sectionHeader}>Manage Registration Data</Text>
+        {status === 'REJECTED' ? (
+          <View style={styles.actionSection}>
+            <Text style={styles.sectionHeader}>Manage Registration Data</Text>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.actionButton,
-              pressed && styles.actionButtonPressed,
-            ]}
-            onPress={() => navigation.navigate('RestaurantRegistration')}
-          >
-            <Text style={styles.actionButtonText}>✏️ Edit Outlet Details</Text>
-          </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionButton,
+                pressed && styles.actionButtonPressed,
+              ]}
+              onPress={() => navigation.navigate('RestaurantRegistration')}
+            >
+              <Text style={styles.actionButtonText}>✏️ Edit Outlet Details</Text>
+            </Pressable>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.actionButton,
-              pressed && styles.actionButtonPressed,
-            ]}
-            onPress={() => navigation.navigate('RestaurantDocuments')}
-          >
-            <Text style={styles.actionButtonText}>
-              📄 Manage Documents (FSSAI / GST / PAN)
-            </Text>
-          </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionButton,
+                pressed && styles.actionButtonPressed,
+              ]}
+              onPress={() => navigation.navigate('RestaurantDocuments')}
+            >
+              <Text style={styles.actionButtonText}>
+                📄 Manage Documents (FSSAI / GST / PAN)
+              </Text>
+            </Pressable>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.actionButton,
-              pressed && styles.actionButtonPressed,
-            ]}
-            onPress={() => navigation.navigate('RestaurantImages')}
-          >
-            <Text style={styles.actionButtonText}>
-              🖼️ Update Images (Logo / Cover Photo)
-            </Text>
-          </Pressable>
-        </View>
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionButton,
+                pressed && styles.actionButtonPressed,
+              ]}
+              onPress={() => navigation.navigate('RestaurantImages')}
+            >
+              <Text style={styles.actionButtonText}>
+                🖼️ Update Images (Logo / Cover Photo)
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   );
