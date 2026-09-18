@@ -45,10 +45,15 @@ export type ProfileStackParamList = {
   NotificationsHome: undefined;
 };
 
+export type CampaignsStackParamList = {
+  CampaignsHome: undefined;
+};
+
 export type MainTabParamList = {
   DashboardTab: undefined;
   OrdersTab: undefined;
   MenuTab: undefined;
+  CampaignsTab: undefined;
   ReviewsTab: undefined;
   ProfileTab: undefined | import('@react-navigation/native').NavigatorScreenParams<ProfileStackParamList>;
 };

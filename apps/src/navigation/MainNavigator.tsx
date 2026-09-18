@@ -19,6 +19,7 @@ import { RestaurantLocationScreen } from '../features/profile/screens/Restaurant
 import { RestaurantProfileScreen } from '../features/profile/screens/RestaurantProfileScreen';
 import { RestaurantSettingsScreen } from '../features/profile/screens/RestaurantSettingsScreen';
 import { SettlementHistoryScreen } from '../features/profile/screens/SettlementHistoryScreen';
+import { CampaignsScreen } from '../features/campaigns/screens/CampaignsScreen';
 import { RestaurantReviewsScreen } from '../features/reviews/screens/RestaurantReviewsScreen';
 import type {
   MainTabParamList,
@@ -26,6 +27,7 @@ import type {
   OrdersStackParamList,
   ProfileStackParamList,
   ReviewsStackParamList,
+  CampaignsStackParamList,
 } from './types';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -34,6 +36,7 @@ const OrdersStack = createNativeStackNavigator<OrdersStackParamList>();
 const MenuStack = createNativeStackNavigator<MenuStackParamList>();
 const ReviewsStack = createNativeStackNavigator<ReviewsStackParamList>();
 const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
+const CampaignsStack = createNativeStackNavigator<CampaignsStackParamList>();
 
 const customHeaderOption = {
   header: ({ options, navigation, back }: any) => (
@@ -98,6 +101,18 @@ function MenuStackNavigator() {
         options={{ title: 'Variants' }}
       />
     </MenuStack.Navigator>
+  );
+}
+
+function CampaignsStackNavigator() {
+  return (
+    <CampaignsStack.Navigator screenOptions={customHeaderOption}>
+      <CampaignsStack.Screen
+        name="CampaignsHome"
+        component={CampaignsScreen}
+        options={{ title: 'Campaigns' }}
+      />
+    </CampaignsStack.Navigator>
   );
 }
 
@@ -235,6 +250,14 @@ export function MainNavigator() {
         options={{
           title: 'Menu',
           tabBarIcon: ({ focused }) => <TabIcon icon="🍽️" focused={focused} />,
+        }}
+      />
+      <Tab.Screen
+        name="CampaignsTab"
+        component={CampaignsStackNavigator}
+        options={{
+          title: 'Promos',
+          tabBarIcon: ({ focused }) => <TabIcon icon="🏷️" focused={focused} />,
         }}
       />
       <Tab.Screen
