@@ -42,7 +42,7 @@ const PayoutProgressBar = ({ status }: { status?: string }) => {
 
     const steps = [
         { label: 'Requested', isActive: step >= 0, isError: false },
-        { label: 'Processing', isActive: step >= 1, isError: false },
+        { label: 'Approved', isActive: step >= 1, isError: false },
         { label: 'Bank Credit', isActive: step >= 2, isError: step === -1 },
     ];
 
@@ -99,13 +99,21 @@ export function SettlementHistoryScreen({ navigation }: Props) {
 
     // Safely parse balance regardless of RTK Query envelope stripping.
     const pending = earningsQuery.data?.balance ?? earningsQuery.data?.data?.balance ?? 0;
+
+    // Only COMPLETED payouts are truly disbursed to bank
     const disbursed = settlements
-        .filter((s: RestaurantSettlement) => s.entryType === 'DEBIT')
+        .filter((s: RestaurantSettlement) => s.entryType === 'DEBIT' && s.status === 'COMPLETED')
+        .reduce((sum, s) => sum + s.amount, 0);
+
+    // Any requested or currently processing payouts
+    const processingAmt = settlements
+        .filter((s: RestaurantSettlement) => s.entryType === 'DEBIT' && (s.status === 'REQUESTED' || s.status === 'PROCESSING'))
         .reduce((sum, s) => sum + s.amount, 0);
 
     const earnings = {
         grossEarnings: summaryQuery.data?.grossSales || 0,
         netSettled: disbursed,
+        processingAmount: processingAmt,
         pendingPayout: pending,
         totalOrders: summaryQuery.data?.totalOrders || 0,
         totalSettlements: settlements.length,
@@ -165,18 +173,27 @@ export function SettlementHistoryScreen({ navigation }: Props) {
                     <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 12 }} />
 
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <View>
+                        <View style={{ flex: 1 }}>
                             <Text variant="caption" style={{ color: '#CBD5E1' }}>
-                                Disbursed to Bank
+                                Disbursed To Bank
                             </Text>
                             <Text variant="heading3" style={{ color: '#4ADE80' }}>
                                 ₹{earnings.netSettled.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </Text>
                         </View>
 
-                        <View style={{ alignItems: 'flex-end' }}>
+                        <View style={{ flex: 1, alignItems: 'center' }}>
                             <Text variant="caption" style={{ color: '#CBD5E1' }}>
-                                Pending Payout
+                                In Process
+                            </Text>
+                            <Text variant="heading3" style={{ color: '#60A5FA' }}>
+                                ₹{earnings.processingAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </Text>
+                        </View>
+
+                        <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                            <Text variant="caption" style={{ color: '#CBD5E1' }}>
+                                Wallet Balance
                             </Text>
                             <Text variant="heading3" style={{ color: BRAND_ACCENT }}>
                                 ₹{earnings.pendingPayout.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
