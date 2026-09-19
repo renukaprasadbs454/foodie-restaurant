@@ -1,41 +1,45 @@
 import React, { useState } from 'react';
 import { View, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { Text } from 'foodie-shared-rn';
-
-// Dummy API to simulate backend interaction
-const createCampaign = async (payload: any) => {
-    return new Promise((resolve) => setTimeout(resolve, 1000));
-};
+import { useCreateCouponMutation } from '../../../api/endpoints/couponsApi';
 
 export const CampaignsScreen = () => {
+    const [createCoupon, { isLoading }] = useCreateCouponMutation();
+
     const [couponCode, setCouponCode] = useState('');
-    const [funderType, setFunderType] = useState('SHARED');
-    const [discountType, setDiscountType] = useState('PERCENTAGE');
-    const [restaurantSharePct, setRestaurantSharePct] = useState('50');
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [discountType, setDiscountType] = useState('PERCENT'); // PERCENT or FLAT
+    const [discountValue, setDiscountValue] = useState('');
+    const [minOrder, setMinOrder] = useState('0');
+    const [maxDiscount, setMaxDiscount] = useState('');
 
     const handleSubmit = async () => {
         if (!couponCode) {
             Alert.alert('Error', 'Please enter a coupon code.');
             return;
         }
-        setIsSubmitting(true);
+        if (!discountValue || Number(discountValue) <= 0) {
+            Alert.alert('Error', 'Please enter a valid discount value.');
+            return;
+        }
+
         try {
-            const shareNum = parseFloat(restaurantSharePct) || 50;
-            await createCampaign({
+            await createCoupon({
                 code: couponCode,
-                funderType: funderType,
-                couponType: 'RESTAURANT_FIRST_ORDER',
-                benefitMode: discountType,
-                restaurantShare: shareNum,
-                foodieShare: 100 - shareNum,
-            });
+                discountType: discountType as 'FLAT' | 'PERCENT',
+                value: parseFloat(discountValue),
+                minOrderAmount: parseFloat(minOrder) || 0,
+                maxDiscountAmount: maxDiscount ? parseFloat(maxDiscount) : undefined,
+                expiryDate: '2099-12-31', // Placeholder or use Date Picker
+                usageLimitPerUser: 1,
+            }).unwrap();
+
             Alert.alert('Success', 'Campaign submitted for approval.');
             setCouponCode('');
+            setDiscountValue('');
+            setMinOrder('0');
+            setMaxDiscount('');
         } catch {
-            Alert.alert('Error', 'Failed to create campaign.');
-        } finally {
-            setIsSubmitting(false);
+            Alert.alert('Error', 'Failed to create campaign. Please try again.');
         }
     };
 
@@ -54,54 +58,78 @@ export const CampaignsScreen = () => {
             </View>
 
             <View style={{ marginBottom: 24 }}>
-                <Text style={{ fontWeight: '600', marginBottom: 8, color: '#4b5563' }}>Funder Type</Text>
+                <Text style={{ fontWeight: '600', marginBottom: 8, color: '#4b5563' }}>Discount Type</Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                    {['RESTAURANT', 'SHARED'].map((type) => (
+                    {['PERCENT', 'FLAT'].map((type) => (
                         <TouchableOpacity
                             key={type}
-                            onPress={() => setFunderType(type)}
+                            onPress={() => setDiscountType(type)}
                             style={{
                                 flex: 1,
                                 padding: 12,
                                 borderRadius: 8,
-                                backgroundColor: funderType === type ? '#fcd34d' : '#f3f4f6',
+                                backgroundColor: discountType === type ? '#fcd34d' : '#f3f4f6',
                                 alignItems: 'center',
                             }}
                         >
-                            <Text style={{ fontWeight: funderType === type ? '700' : '400' }}>{type}</Text>
+                            <Text style={{ fontWeight: discountType === type ? '700' : '400' }}>
+                                {type === 'PERCENT' ? 'Percentage (%)' : 'Fixed Amount (₹)'}
+                            </Text>
                         </TouchableOpacity>
                     ))}
                 </View>
             </View>
 
-            {funderType === 'SHARED' && (
-                <View style={{ marginBottom: 24, padding: 16, backgroundColor: '#f9fafb', borderRadius: 8 }}>
-                    <Text style={{ fontWeight: '600', marginBottom: 12, color: '#4b5563' }}>
-                        Funding Share: Restaurant {restaurantSharePct}% / Foodie {100 - (parseFloat(restaurantSharePct) || 0)}%
-                    </Text>
+            <View style={{ marginBottom: 24 }}>
+                <Text style={{ fontWeight: '600', marginBottom: 8, color: '#4b5563' }}>
+                    {discountType === 'PERCENT' ? 'Discount Percentage (%)' : 'Discount Amount (₹)'}
+                </Text>
+                <TextInput
+                    style={{ borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, padding: 12, backgroundColor: '#FFFFFF' }}
+                    keyboardType="numeric"
+                    value={discountValue}
+                    onChangeText={setDiscountValue}
+                    placeholder={`e.g. ${discountType === 'PERCENT' ? '20' : '150'}`}
+                />
+            </View>
+
+            {discountType === 'PERCENT' && (
+                <View style={{ marginBottom: 24 }}>
+                    <Text style={{ fontWeight: '600', marginBottom: 8, color: '#4b5563' }}>Max Discount Amount (₹)</Text>
                     <TextInput
                         style={{ borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, padding: 12, backgroundColor: '#FFFFFF' }}
                         keyboardType="numeric"
-                        value={restaurantSharePct}
-                        onChangeText={setRestaurantSharePct}
-                        placeholder="Restaurant % Share (e.g. 50)"
+                        value={maxDiscount}
+                        onChangeText={setMaxDiscount}
+                        placeholder="e.g. 100"
                     />
                 </View>
             )}
 
+            <View style={{ marginBottom: 24 }}>
+                <Text style={{ fontWeight: '600', marginBottom: 8, color: '#4b5563' }}>Minimum Order Amount (₹)</Text>
+                <TextInput
+                    style={{ borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, padding: 12, backgroundColor: '#FFFFFF' }}
+                    keyboardType="numeric"
+                    value={minOrder}
+                    onChangeText={setMinOrder}
+                    placeholder="e.g. 500"
+                />
+            </View>
+
             <TouchableOpacity
                 onPress={handleSubmit}
-                disabled={isSubmitting}
+                disabled={isLoading}
                 style={{
                     backgroundColor: '#16a34a',
                     padding: 16,
                     borderRadius: 8,
                     alignItems: 'center',
-                    opacity: isSubmitting ? 0.7 : 1,
+                    opacity: isLoading ? 0.7 : 1,
                 }}
             >
                 <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>
-                    {isSubmitting ? 'Submitting...' : 'Create Campaign'}
+                    {isLoading ? 'Submitting...' : 'Submit Request'}
                 </Text>
             </TouchableOpacity>
         </ScrollView>
