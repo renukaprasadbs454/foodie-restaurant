@@ -24,7 +24,7 @@ export const CampaignsScreen = () => {
 
         try {
             await createCoupon({
-                code: couponCode,
+                code: couponCode.trim().toUpperCase().replace(/[^A-Z0-9_]/g, ''),
                 discountType: discountType as 'FLAT' | 'PERCENT',
                 value: parseFloat(discountValue),
                 minOrderAmount: parseFloat(minOrder) || 0,
