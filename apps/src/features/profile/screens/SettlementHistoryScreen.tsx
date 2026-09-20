@@ -103,12 +103,12 @@ export function SettlementHistoryScreen({ navigation }: Props) {
     // Only COMPLETED payouts are truly disbursed to bank
     const disbursed = settlements
         .filter((s: RestaurantSettlement) => s.entryType === 'DEBIT' && s.status === 'COMPLETED')
-        .reduce((sum, s) => sum + s.amount, 0);
+        .reduce((sum: number, s: RestaurantSettlement) => sum + s.amount, 0);
 
     // Any requested or currently processing payouts
     const processingAmt = settlements
         .filter((s: RestaurantSettlement) => s.entryType === 'DEBIT' && (s.status === 'REQUESTED' || s.status === 'PROCESSING'))
-        .reduce((sum, s) => sum + s.amount, 0);
+        .reduce((sum: number, s: RestaurantSettlement) => sum + s.amount, 0);
 
     const earnings = {
         grossEarnings: summaryQuery.data?.grossSales || 0,
