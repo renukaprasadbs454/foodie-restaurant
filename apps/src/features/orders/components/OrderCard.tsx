@@ -6,6 +6,9 @@ import type { OrderSummary, RestaurantTransitionStatus } from '../types';
 import { formatMoney, restaurantActionsForStatus } from '../types';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { SwipeButton } from '../../../components/SwipeButton';
+import { Modal } from 'foodie-shared-rn';
+import { OrderChat } from './OrderChat';
+import { isTerminalOrderStatus } from '../types';
 
 type Props = {
   order: OrderSummary;
@@ -29,6 +32,7 @@ export function OrderCard({
   isTransitioning,
 }: Props) {
   const { tokens } = useTheme();
+  const [chatVisible, setChatVisible] = React.useState(false);
 
   // Optionally fetch full OrderDetail for line items breakdown if available
   const orderDetailsQuery = useGetOrderQuery(order.orderId, {
@@ -174,6 +178,30 @@ export function OrderCard({
           </Text>
         </View>
       </View>
+
+      {/* LIVE MESSAGE / CHAT OPTION */}
+      {status && !isTerminalOrderStatus(status) ? (
+        <View style={{ paddingTop: tokens.spacing.xs }}>
+          <Button
+            label="💬 Chat with Customer"
+            accessibilityLabel="Open Chat"
+            variant="secondary"
+            onPress={() => setChatVisible(true)}
+            style={{ borderRadius: 10, height: 44 }}
+          />
+        </View>
+      ) : null}
+
+      <Modal
+        visible={chatVisible}
+        onRequestClose={() => setChatVisible(false)}
+        title={`Chat (Order ${order.orderNumber})`}
+        accessibilityLabel="Live Chat dialog"
+      >
+        <View style={{ height: 400 }}>
+          <OrderChat orderId={order.orderId} senderRole="RESTAURANT" />
+        </View>
+      </Modal>
 
       {/* ORDER ACTION BUTTONS */}
       <View

@@ -108,6 +108,7 @@ export function hasMoreOrderPages(
 
 const TERMINAL: ReadonlySet<string> = new Set([
   'DELIVERED',
+  'COMPLETED',
   'CANCELLED',
   'REJECTED',
 ]);
