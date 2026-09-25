@@ -185,12 +185,12 @@ export function OrderCard({
         {['CONFIRMED', 'PLACED', 'PENDING'].includes(status) ? (
           <View style={{ flexDirection: 'column', gap: tokens.spacing.sm }}>
             <SwipeButton
-              title="Swipe to Accept Order"
+              title="Accept Order"
               backgroundColor={BRAND_PRIMARY}
               onSwipeSuccess={() => onTransitionStatus(order.orderId, 'ACCEPTED')}
             />
             <SwipeButton
-              title="Swipe to Reject Order"
+              title="Reject Order"
               backgroundColor="#DC2626"
               onSwipeSuccess={() => onOpenRejectModal(order.orderId, order.orderNumber)}
             />
@@ -202,7 +202,7 @@ export function OrderCard({
               <Text style={{ color: '#2563EB', fontWeight: 'bold' }}>Cooking in progress...</Text>
             </View>
             <SwipeButton
-              title="Swipe: Ready for Pickup"
+              title="Ready for Pickup"
               backgroundColor="#16A34A"
               onSwipeSuccess={() => onTransitionStatus(order.orderId, 'READY_FOR_PICKUP')}
             />
@@ -210,7 +210,7 @@ export function OrderCard({
         ) : status === 'READY_FOR_PICKUP' ? (
           <View style={{ width: '100%', gap: tokens.spacing.sm }}>
             <SwipeButton
-              title="Swipe: Hand Over (Collected)"
+              title="Hand Over (Collected)"
               backgroundColor={BRAND_PRIMARY}
               onSwipeSuccess={() => onTransitionStatus(order.orderId, 'PICKED_UP')}
             />

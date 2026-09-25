@@ -363,12 +363,12 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
                       key={action}
                       title={
                         action === 'ACCEPTED'
-                          ? 'Swipe to Accept Order'
+                          ? 'Accept Order'
                           : action === 'REJECTED'
-                            ? 'Swipe to Reject Order'
+                            ? 'Reject Order'
                             : action === 'PREPARING'
-                              ? 'Swipe to Start Preparation 🍳'
-                              : 'Swipe to Mark Ready 📦'
+                              ? 'Start Preparation 🍳'
+                              : 'Mark Ready 📦'
                       }
                       backgroundColor={action === 'REJECTED' ? '#DC2626' : BRAND_PRIMARY}
                       onSwipeSuccess={() => {

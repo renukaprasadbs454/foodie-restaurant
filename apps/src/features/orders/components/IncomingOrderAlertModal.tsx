@@ -4,6 +4,7 @@ import { Button, Modal, Text, useTheme } from 'foodie-shared-rn';
 import type { OrderSummary } from '../types';
 import { formatMoney } from '../types';
 import { useGetOrderQuery } from '../../../api/endpoints/ordersApi';
+import { SwipeButton } from '../../../components/SwipeButton';
 
 type Props = {
     order: OrderSummary | null;
@@ -197,19 +198,16 @@ export function IncomingOrderAlertModal({
                 </View>
 
                 {/* ACTION BUTTONS (ACCEPT / REJECT) */}
-                <View style={{ flexDirection: 'row', gap: tokens.spacing.sm, marginTop: tokens.spacing.xs }}>
-                    <Button
-                        label="❌ Reject"
-                        accessibilityLabel="Reject incoming order"
-                        variant="danger"
-                        style={{ flex: 1, height: 48, borderRadius: 12 }}
-                        onPress={() => onReject(order.orderId)}
+                <View style={{ flexDirection: 'column', gap: tokens.spacing.sm, marginTop: tokens.spacing.xs }}>
+                    <SwipeButton
+                        title="Accept Order"
+                        backgroundColor={BRAND_PRIMARY}
+                        onSwipeSuccess={() => onAccept(order.orderId)}
                     />
-                    <Button
-                        label="✅ ACCEPT ORDER"
-                        accessibilityLabel="Accept incoming order"
-                        style={{ flex: 2, height: 48, backgroundColor: BRAND_PRIMARY, borderRadius: 12 }}
-                        onPress={() => onAccept(order.orderId)}
+                    <SwipeButton
+                        title="Reject Order"
+                        backgroundColor="#DC2626"
+                        onSwipeSuccess={() => onReject(order.orderId)}
                     />
                 </View>
             </View>
