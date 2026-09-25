@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { View, Text, Animated, PanResponder, StyleSheet } from 'react-native';
 
 interface SwipeButtonProps {
@@ -12,6 +12,11 @@ export function SwipeButton({ onSwipeSuccess, title, backgroundColor = '#14532D'
     const [width, setWidth] = useState(300);
     const thumbWidth = 56;
     const [swipeSuccess, setSwipeSuccess] = useState(false);
+
+    const onSwipeSuccessRef = useRef(onSwipeSuccess);
+    useEffect(() => {
+        onSwipeSuccessRef.current = onSwipeSuccess;
+    }, [onSwipeSuccess]);
 
     const reset = () => {
         setSwipeSuccess(false);
@@ -38,7 +43,9 @@ export function SwipeButton({ onSwipeSuccess, title, backgroundColor = '#14532D'
                         useNativeDriver: false,
                     }).start(() => {
                         setSwipeSuccess(true);
-                        onSwipeSuccess();
+                        if (onSwipeSuccessRef.current) {
+                            onSwipeSuccessRef.current();
+                        }
                         // Automatically reset after 1 second for reusability if needed
                         setTimeout(reset, 1000);
                     });
@@ -52,6 +59,9 @@ export function SwipeButton({ onSwipeSuccess, title, backgroundColor = '#14532D'
         })
     ).current;
 
+    /**
+     * Re-assign the pan.x when width changes so we don't carry over stale max swipe bounds
+     */
     return (
         <View
             style={[styles.container, { backgroundColor }]}

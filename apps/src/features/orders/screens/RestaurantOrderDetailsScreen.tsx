@@ -388,7 +388,9 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
                             ? 'Reject Order'
                             : action === 'PREPARING'
                               ? 'Start Preparation 🍳'
-                              : 'Mark Ready 📦'
+                              : action === 'READY_FOR_PICKUP'
+                                ? 'Mark Ready 📦'
+                                : 'Hand Over (Collected) 🛍️'
                       }
                       backgroundColor={action === 'REJECTED' ? '#DC2626' : BRAND_PRIMARY}
                       onSwipeSuccess={() => {

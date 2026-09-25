@@ -123,11 +123,15 @@ export function restaurantActionsForStatus(
 ): RestaurantTransitionStatus[] {
   switch (status) {
     case 'CONFIRMED':
+    case 'PLACED':
+    case 'PENDING':
       return ['ACCEPTED', 'REJECTED'];
     case 'ACCEPTED':
       return ['PREPARING'];
     case 'PREPARING':
       return ['READY_FOR_PICKUP'];
+    case 'READY_FOR_PICKUP':
+      return ['PICKED_UP'];
     default:
       return [];
   }
