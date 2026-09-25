@@ -5,6 +5,7 @@ import { useGetOrderQuery } from '../../../api/endpoints/ordersApi';
 import type { OrderSummary, RestaurantTransitionStatus } from '../types';
 import { formatMoney, restaurantActionsForStatus } from '../types';
 import { OrderStatusBadge } from './OrderStatusBadge';
+import { SwipeButton } from '../../../components/SwipeButton';
 
 type Props = {
   order: OrderSummary;
@@ -182,20 +183,16 @@ export function OrderCard({
         }}
       >
         {['CONFIRMED', 'PLACED', 'PENDING'].includes(status) ? (
-          <View style={{ flexDirection: 'row', gap: tokens.spacing.sm }}>
-            <Button
-              label="Reject"
-              accessibilityLabel={`Reject order ${order.orderNumber}`}
-              variant="danger"
-              style={{ flex: 1, paddingHorizontal: 12, height: 44 }}
-              onPress={() => onOpenRejectModal(order.orderId, order.orderNumber)}
+          <View style={{ flexDirection: 'column', gap: tokens.spacing.sm }}>
+            <SwipeButton
+              title="Swipe to Accept Order"
+              backgroundColor={BRAND_PRIMARY}
+              onSwipeSuccess={() => onTransitionStatus(order.orderId, 'ACCEPTED')}
             />
-            <Button
-              label="Accept Order"
-              accessibilityLabel={`Accept order ${order.orderNumber}`}
-              loading={isTransitioning}
-              style={{ flex: 2, backgroundColor: BRAND_PRIMARY, paddingHorizontal: 16, height: 44 }}
-              onPress={() => onTransitionStatus(order.orderId, 'ACCEPTED')}
+            <SwipeButton
+              title="Swipe to Reject Order"
+              backgroundColor="#DC2626"
+              onSwipeSuccess={() => onOpenRejectModal(order.orderId, order.orderNumber)}
             />
           </View>
         ) : ['ACCEPTED', 'PREPARING'].includes(status) ? (
@@ -204,22 +201,18 @@ export function OrderCard({
               <Text style={{ fontSize: 13 }}>🟢</Text>
               <Text style={{ color: '#2563EB', fontWeight: 'bold' }}>Cooking in progress...</Text>
             </View>
-            <Button
-              label="Mark Ready for Pickup"
-              accessibilityLabel={`Mark food ready for pickup for order ${order.orderNumber}`}
-              loading={isTransitioning}
-              style={{ backgroundColor: '#16A34A', paddingHorizontal: 16, height: 46, borderRadius: 10, width: '100%' }}
-              onPress={() => onTransitionStatus(order.orderId, 'READY_FOR_PICKUP')}
+            <SwipeButton
+              title="Swipe: Ready for Pickup"
+              backgroundColor="#16A34A"
+              onSwipeSuccess={() => onTransitionStatus(order.orderId, 'READY_FOR_PICKUP')}
             />
           </View>
         ) : status === 'READY_FOR_PICKUP' ? (
           <View style={{ width: '100%', gap: tokens.spacing.sm }}>
-            <Button
-              label="Hand Over (Order Collected)"
-              accessibilityLabel={`Complete order ${order.orderNumber}`}
-              loading={isTransitioning}
-              style={{ paddingHorizontal: 16, height: 46, borderRadius: 10, width: '100%' }}
-              onPress={() => onTransitionStatus(order.orderId, 'PICKED_UP')}
+            <SwipeButton
+              title="Swipe: Hand Over (Collected)"
+              backgroundColor={BRAND_PRIMARY}
+              onSwipeSuccess={() => onTransitionStatus(order.orderId, 'PICKED_UP')}
             />
           </View>
         ) : null}

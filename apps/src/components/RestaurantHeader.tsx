@@ -155,7 +155,14 @@ export function RestaurantHeader({
                   ]
                 );
               } else {
-                toggleStatus(true);
+                Alert.alert(
+                  'Confirm Online',
+                  'Are you sure you want to go online? You will start receiving new orders.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Confirm', style: 'default', onPress: () => toggleStatus(true) },
+                  ]
+                );
               }
             }}
             accessibilityRole="button"

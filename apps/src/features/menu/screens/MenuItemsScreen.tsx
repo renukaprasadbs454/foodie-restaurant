@@ -340,7 +340,7 @@ export function MenuItemsScreen({ navigation }: Props) {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         quality: 0.8,
-        allowsEditing: true,
+        allowsEditing: false,
         aspect: [1, 1],
       });
       if (!result.canceled && result.assets?.[0]) {
@@ -867,7 +867,7 @@ export function MenuItemsScreen({ navigation }: Props) {
                 >
                   {/* LEFT: Dish Thumbnail & Change Photo */}
                   <View style={{ alignItems: 'center', gap: 6 }}>
-                    <FoodImage url={item.imageUrl} name={item.name} size={80} />
+                    <FoodImage url={resolveImageUrl(item.imageUrl) || undefined} name={item.name} size={80} />
                     <Pressable
                       onPress={() => openEditModal(item)}
                       style={{
@@ -1040,7 +1040,7 @@ export function MenuItemsScreen({ navigation }: Props) {
               <View style={{ gap: tokens.spacing.xs }}>
                 <Text variant="label">Food Image</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.md }}>
-                  <FoodImage url={formImageUrl} name={formName || 'Dish'} size={70} />
+                  <FoodImage url={resolveImageUrl(formImageUrl) || undefined} name={formName || 'Dish'} size={70} />
 
                   <View style={{ gap: 6, flex: 1 }}>
                     <Pressable

@@ -23,6 +23,7 @@ import { OrderDetailSkeleton } from '../components/OrderDetailSkeleton';
 import { OrderStatusBadge } from '../components/OrderStatusBadge';
 import { OrderTimeline } from '../components/OrderTimeline';
 import { RejectOrderModal } from '../components/RejectOrderModal';
+import { SwipeButton } from '../../../components/SwipeButton';
 import { useRestaurantOrdersSubscription } from '../hooks/useRestaurantOrdersSubscription';
 import {
   formatMoney,
@@ -358,22 +359,19 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
                 </Text>
                 <View style={{ gap: tokens.spacing.sm }}>
                   {actions.map((action) => (
-                    <Button
+                    <SwipeButton
                       key={action}
-                      label={
+                      title={
                         action === 'ACCEPTED'
-                          ? 'Accept Order & Send to Kitchen'
+                          ? 'Swipe to Accept Order'
                           : action === 'REJECTED'
-                            ? 'Reject Order'
+                            ? 'Swipe to Reject Order'
                             : action === 'PREPARING'
-                              ? 'Start Food Preparation 🍳'
-                              : 'Mark Ready for Delivery Pickup 📦'
+                              ? 'Swipe to Start Preparation 🍳'
+                              : 'Swipe to Mark Ready 📦'
                       }
-                      accessibilityLabel={action}
-                      style={{
-                        backgroundColor: action === 'REJECTED' ? '#DC2626' : BRAND_PRIMARY,
-                      }}
-                      onPress={() => {
+                      backgroundColor={action === 'REJECTED' ? '#DC2626' : BRAND_PRIMARY}
+                      onSwipeSuccess={() => {
                         if (action === 'REJECTED') {
                           setShowRejectModal(true);
                           return;
