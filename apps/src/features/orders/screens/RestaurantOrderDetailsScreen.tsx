@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   EmptyState,
+  Modal,
   Text,
   Toast,
   trackAnalyticsEvent,
@@ -57,6 +58,7 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
 
   const { wsActive } = useRestaurantOrdersSubscription(restaurantId ?? null);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [chatVisible, setChatVisible] = useState(false);
 
   const [toast, setToast] = useState<{
     message: string;
@@ -347,9 +349,27 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
             </Card>
 
             {/* LIVE MESSAGE / CHAT OPTION */}
-            {order.status && !isTerminalOrderStatus(order.status) ? (
-              <OrderChat orderId={order.orderId} senderRole="RESTAURANT" />
-            ) : null}
+            <View style={{ paddingHorizontal: tokens.spacing.md, marginTop: tokens.spacing.md }}>
+              {order.status && !isTerminalOrderStatus(order.status) ? (
+                <Button
+                  label="💬 Chat with Customer"
+                  accessibilityLabel="Open Chat"
+                  variant="secondary"
+                  onPress={() => setChatVisible(true)}
+                />
+              ) : null}
+            </View>
+
+            <Modal
+              visible={chatVisible}
+              onRequestClose={() => setChatVisible(false)}
+              title="Live Chat with Customer"
+              accessibilityLabel="Live Chat dialog"
+            >
+              <View style={{ height: 400 }}>
+                <OrderChat orderId={order.orderId} senderRole="RESTAURANT" />
+              </View>
+            </Modal>
 
             {/* KITCHEN ORDER ACTIONS CARD */}
             {actions.length > 0 ? (
