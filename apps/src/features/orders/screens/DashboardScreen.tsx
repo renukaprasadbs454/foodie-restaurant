@@ -121,6 +121,8 @@ export function DashboardScreen({ navigation }: Props) {
     apiProfile?.logoImageUrl ?? (isUsingMock ? mockProfile.logoImageUrl : null);
   const displayStatus =
     apiProfile?.status ?? (isUsingMock ? mockProfile.status : 'APPROVED');
+  const isOnline =
+    apiProfile?.isOpen ?? (isUsingMock ? mockProfile.isOpen : false);
 
   const orders =
     apiOrders && apiOrders.length > 0
@@ -293,11 +295,11 @@ export function DashboardScreen({ navigation }: Props) {
                     width: 8,
                     height: 8,
                     borderRadius: 4,
-                    backgroundColor: BRAND_ACCENT,
+                    backgroundColor: isOnline ? BRAND_ACCENT : '#FCA5A5',
                   }}
                 />
-                <Text variant="caption" style={{ color: BRAND_ACCENT, fontWeight: 'bold' }}>
-                  ONLINE & ACCEPTING ORDERS
+                <Text variant="caption" style={{ color: isOnline ? BRAND_ACCENT : '#FCA5A5', fontWeight: 'bold' }}>
+                  {isOnline ? 'ONLINE & ACCEPTING ORDERS' : 'OFFLINE'}
                 </Text>
                 <Text variant="caption" style={{ color: '#A7F3D0', fontSize: 11 }}>
                   ({displayStatus})

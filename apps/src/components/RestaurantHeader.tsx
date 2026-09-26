@@ -9,6 +9,9 @@ import { store } from '../store/store';
 import { useGetRestaurantProfileQuery, useToggleRestaurantStatusMutation } from '../api/endpoints/restaurantsApi';
 import { useGetNotificationsQuery } from '../api/endpoints/notificationsApi';
 
+let isAutoOverridden = false;
+
+
 type Props = {
   title?: string;
   subtitle?: string;
@@ -73,6 +76,9 @@ export function RestaurantHeader({
     if (!open || !close) return;
 
     const checkStatus = () => {
+      // If user toggled manually this session, respect their choice
+      if (isAutoOverridden) return;
+
       try {
         const now = new Date();
         const current = now.getHours() * 60 + now.getMinutes();
@@ -191,9 +197,32 @@ export function RestaurantHeader({
         {/* RIGHT ACTION CONTROLS: ONLINE STATUS, BELL & PROFILE AVATAR */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.sm }}>
           {/* ONLINE / OFFLINE TOGGLE PILL */}
-          <View
+          <Pressable
+            onPress={() => {
+              isAutoOverridden = true;
+              if (isOnline) {
+                Alert.alert(
+                  'Confirm Offline',
+                  'Are you sure you want to go offline? You will stop receiving new orders.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Confirm', style: 'destructive', onPress: () => toggleStatus(false) },
+                  ]
+                );
+              } else {
+                Alert.alert(
+                  'Confirm Online',
+                  'Are you sure you want to go online? You will start receiving new orders.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Confirm', style: 'default', onPress: () => toggleStatus(true) },
+                  ]
+                );
+              }
+            }}
+            accessibilityRole="button"
             accessibilityLabel={`Restaurant status ${isOnline ? 'Online' : 'Offline'}`}
-            style={{
+            style={({ pressed }) => [{
               flexDirection: 'row',
               alignItems: 'center',
               paddingHorizontal: 10,
@@ -203,7 +232,8 @@ export function RestaurantHeader({
               backgroundColor: isOnline ? '#064E3B' : '#7F1D1D',
               borderWidth: 1,
               borderColor: isOnline ? '#059669' : '#DC2626',
-            }}
+              opacity: pressed ? 0.8 : 1,
+            }]}
           >
             <View
               style={{
@@ -223,7 +253,7 @@ export function RestaurantHeader({
             >
               {isOnline ? 'Online' : 'Offline'}
             </Text>
-          </View>
+          </Pressable>
 
           {/* NOTIFICATION BELL ICON WITH AMBER DOT */}
           <Pressable
