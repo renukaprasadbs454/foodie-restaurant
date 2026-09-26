@@ -53,46 +53,53 @@ export function RestaurantHeader({
 
   useEffect(() => {
     if (!profile) return;
-    const openMatch = profile.description?.match(/\[OPEN:(.*?)\]/);
-    const closeMatch = profile.description?.match(/\[CLOSE:(.*?)\]/);
+    const openMatch = profile.description?.match(/\[OPEN:(.*?)\]/i);
+    const closeMatch = profile.description?.match(/\[CLOSE:(.*?)\]/i);
     if (!openMatch || !closeMatch) return;
 
-    try {
-      const parseTime = (val: string) => {
-        const parts = val.trim().split(' ');
-        if (parts.length < 2) return null;
-        const [time, mod] = parts;
-        const timeParts = time.split(':');
-        if (timeParts.length < 2) return null;
-        let h = parseInt(timeParts[0], 10);
-        const m = parseInt(timeParts[1], 10);
-        if (mod.toUpperCase() === 'PM' && h < 12) h += 12;
-        if (mod.toUpperCase() === 'AM' && h === 12) h = 0;
-        return { h, m };
-      };
-      const open = parseTime(openMatch[1]);
-      const close = parseTime(closeMatch[1]);
-      if (!open || !close) return;
+    const parseTime = (val: string) => {
+      const match = val.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+      if (!match) return null;
+      let h = parseInt(match[1], 10);
+      const m = parseInt(match[2], 10);
+      const mod = match[3] ? match[3].toUpperCase() : null;
+      if (mod === 'PM' && h < 12) h += 12;
+      if (mod === 'AM' && h === 12) h = 0;
+      return { h, m };
+    };
 
-      const now = new Date();
-      const current = now.getHours() * 60 + now.getMinutes();
-      const o = open.h * 60 + open.m;
-      const c = close.h * 60 + close.m;
+    const open = parseTime(openMatch[1]);
+    const close = parseTime(closeMatch[1]);
+    if (!open || !close) return;
 
-      let shouldBeOpen = false;
-      if (c < o) {
-        shouldBeOpen = current >= o || current <= c;
-      } else {
-        shouldBeOpen = current >= o && current <= c;
+    const checkStatus = () => {
+      try {
+        const now = new Date();
+        const current = now.getHours() * 60 + now.getMinutes();
+        const o = open.h * 60 + open.m;
+        const c = close.h * 60 + close.m;
+
+        let shouldBeOpen = false;
+        if (c < o) {
+          shouldBeOpen = current >= o || current <= c;
+        } else {
+          shouldBeOpen = current >= o && current <= c;
+        }
+
+        if (shouldBeOpen !== isOnline) {
+          // Fire and forget
+          toggleStatus(shouldBeOpen).catch(() => { });
+        }
+      } catch (e) {
+        // ignore
       }
+    };
 
-      if (shouldBeOpen !== isOnline) {
-        toggleStatus(shouldBeOpen);
-      }
-    } catch (e) {
-      // ignore
-    }
-  }, [profile, isOnline, toggleStatus]);
+    checkStatus(); // Check immediately
+    const interval = setInterval(checkStatus, 30000); // Check every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [profile?.description, isOnline, toggleStatus]);
 
   const handleNotificationPress = () => {
     if (navigation && typeof navigation.navigate === 'function') {
