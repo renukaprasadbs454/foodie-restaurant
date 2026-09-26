@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Pressable, View, useWindowDimensions, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, useTheme } from 'foodie-shared-rn';
@@ -51,7 +51,48 @@ export function RestaurantHeader({
 
   const canGoBack = showBack || (navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack());
 
+  useEffect(() => {
+    if (!profile) return;
+    const openMatch = profile.description?.match(/\[OPEN:(.*?)\]/);
+    const closeMatch = profile.description?.match(/\[CLOSE:(.*?)\]/);
+    if (!openMatch || !closeMatch) return;
 
+    try {
+      const parseTime = (val: string) => {
+        const parts = val.trim().split(' ');
+        if (parts.length < 2) return null;
+        const [time, mod] = parts;
+        const timeParts = time.split(':');
+        if (timeParts.length < 2) return null;
+        let h = parseInt(timeParts[0], 10);
+        const m = parseInt(timeParts[1], 10);
+        if (mod.toUpperCase() === 'PM' && h < 12) h += 12;
+        if (mod.toUpperCase() === 'AM' && h === 12) h = 0;
+        return { h, m };
+      };
+      const open = parseTime(openMatch[1]);
+      const close = parseTime(closeMatch[1]);
+      if (!open || !close) return;
+
+      const now = new Date();
+      const current = now.getHours() * 60 + now.getMinutes();
+      const o = open.h * 60 + open.m;
+      const c = close.h * 60 + close.m;
+
+      let shouldBeOpen = false;
+      if (c < o) {
+        shouldBeOpen = current >= o || current <= c;
+      } else {
+        shouldBeOpen = current >= o && current <= c;
+      }
+
+      if (shouldBeOpen !== isOnline) {
+        toggleStatus(shouldBeOpen);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [profile, isOnline, toggleStatus]);
 
   const handleNotificationPress = () => {
     if (navigation && typeof navigation.navigate === 'function') {
@@ -143,31 +184,9 @@ export function RestaurantHeader({
         {/* RIGHT ACTION CONTROLS: ONLINE STATUS, BELL & PROFILE AVATAR */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.sm }}>
           {/* ONLINE / OFFLINE TOGGLE PILL */}
-          <Pressable
-            onPress={() => {
-              if (isOnline) {
-                Alert.alert(
-                  'Confirm Offline',
-                  'Are you sure you want to go offline? You will stop receiving new orders.',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Confirm', style: 'destructive', onPress: () => toggleStatus(false) },
-                  ]
-                );
-              } else {
-                Alert.alert(
-                  'Confirm Online',
-                  'Are you sure you want to go online? You will start receiving new orders.',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Confirm', style: 'default', onPress: () => toggleStatus(true) },
-                  ]
-                );
-              }
-            }}
-            accessibilityRole="button"
+          <View
             accessibilityLabel={`Restaurant status ${isOnline ? 'Online' : 'Offline'}`}
-            style={({ pressed }) => [{
+            style={{
               flexDirection: 'row',
               alignItems: 'center',
               paddingHorizontal: 10,
@@ -177,8 +196,7 @@ export function RestaurantHeader({
               backgroundColor: isOnline ? '#064E3B' : '#7F1D1D',
               borderWidth: 1,
               borderColor: isOnline ? '#059669' : '#DC2626',
-              opacity: pressed ? 0.8 : 1,
-            }]}
+            }}
           >
             <View
               style={{
@@ -198,7 +216,7 @@ export function RestaurantHeader({
             >
               {isOnline ? 'Online' : 'Offline'}
             </Text>
-          </Pressable>
+          </View>
 
           {/* NOTIFICATION BELL ICON WITH AMBER DOT */}
           <Pressable

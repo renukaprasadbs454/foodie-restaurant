@@ -37,6 +37,7 @@ export function RestaurantImagesScreen({ navigation }: Props) {
   const [upload, uploadState] = useUploadRestaurantImagesMutation();
   const [imageType, setImageType] = useState<RestaurantImageType>('LOGO');
   const [previewUri, setPreviewUri] = useState<string | null>(null);
+  const [pendingAsset, setPendingAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [toast, setToast] = useState<{
     message: string;
     variant: 'info' | 'success' | 'error' | 'warning';
@@ -57,7 +58,7 @@ export function RestaurantImagesScreen({ navigation }: Props) {
     trackAnalyticsEvent('restaurant_images_viewed');
   }, []);
 
-  const onPickAndUpload = async (selectedImageType: RestaurantImageType) => {
+  const onPickImage = async (selectedImageType: RestaurantImageType) => {
     setImageType(selectedImageType);
     if (!isConnected) {
       setToast({
@@ -77,12 +78,11 @@ export function RestaurantImagesScreen({ navigation }: Props) {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 1,
-      allowsEditing: true,
-      aspect: imageType === 'LOGO' ? [1, 1] : [16, 9],
+      allowsEditing: false,
     });
     if (result.canceled || !result.assets?.[0]) return;
     const asset = result.assets[0];
-    setPreviewUri(asset.uri);
+
     const mimeType = asset.mimeType ?? 'image/jpeg';
     if (!(IMAGE_ALLOWED_MIME_TYPES as readonly string[]).includes(mimeType)) {
       setToast({
@@ -101,17 +101,29 @@ export function RestaurantImagesScreen({ navigation }: Props) {
       });
       return;
     }
+
+    setPreviewUri(asset.uri);
+    setPendingAsset(asset);
+  };
+
+  const onSaveImage = async () => {
+    if (!pendingAsset || !isConnected) return;
+
+    const asset = pendingAsset;
+    const mimeType = asset.mimeType ?? 'image/jpeg';
+
     try {
       await upload({
-        imageType: selectedImageType,
+        imageType: imageType,
         uri: asset.uri,
         mimeType,
-        fileName: asset.fileName ?? `${selectedImageType.toLowerCase()}.jpg`,
+        fileName: asset.fileName ?? `${imageType.toLowerCase()}.jpg`,
         fileObj: (asset as any).file,
       }).unwrap();
-      trackAnalyticsEvent('image_uploaded', { imageType: selectedImageType });
-      trackAnalyticsEvent('restaurant_image_uploaded', { imageType: selectedImageType });
-      setToast({ message: `${selectedImageType} uploaded successfully!`, variant: 'success' });
+      trackAnalyticsEvent('image_uploaded', { imageType });
+      trackAnalyticsEvent('restaurant_image_uploaded', { imageType });
+      setToast({ message: `${imageType} uploaded successfully!`, variant: 'success' });
+      setPendingAsset(null);
     } catch (error) {
       handleError(toUnwrappedApiError(error));
     }
@@ -153,7 +165,7 @@ export function RestaurantImagesScreen({ navigation }: Props) {
                 <Pressable
                   key={type}
                   onPress={() => {
-                    void onPickAndUpload(type);
+                    void onPickImage(type);
                   }}
                   style={[
                     styles.imageTypeChip,
@@ -193,6 +205,27 @@ export function RestaurantImagesScreen({ navigation }: Props) {
               </View>
             )}
           </View>
+
+          {/* Upload Action */}
+          {pendingAsset && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.primaryButton,
+                pressed && styles.primaryButtonPressed,
+                uploadState.isLoading && styles.buttonDisabled
+              ]}
+              onPress={() => void onSaveImage()}
+              disabled={uploadState.isLoading}
+            >
+              {uploadState.isLoading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.primaryButtonText}>
+                  💾 Save {imageType === 'LOGO' ? 'Logo' : 'Cover Image'}
+                </Text>
+              )}
+            </Pressable>
+          )}
         </View>
 
         {/* Continue Action */}

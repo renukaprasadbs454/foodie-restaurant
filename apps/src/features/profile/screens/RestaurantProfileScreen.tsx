@@ -223,8 +223,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 1,
-      allowsEditing: true,
-      aspect: [1, 1],
+      allowsEditing: false,
     });
     if (result.canceled || !result.assets?.[0]) return;
     const asset = result.assets[0];
@@ -242,6 +241,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
         uri: asset.uri,
         mimeType,
         fileName: asset.fileName ?? 'profile.jpg',
+        fileObj: (asset as any).file,
       }).unwrap();
       setAvatarUri(asset.uri);
       setToast({ message: 'Photo uploaded successfully.', variant: 'success' });
@@ -259,8 +259,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 1,
-      allowsEditing: true,
-      aspect: [16, 9],
+      allowsEditing: false,
     });
     if (result.canceled || !result.assets?.[0]) return;
     const asset = result.assets[0];
@@ -278,6 +277,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
         uri: asset.uri,
         mimeType,
         fileName: asset.fileName ?? 'cover.jpg',
+        fileObj: (asset as any).file,
       }).unwrap();
       setCoverUri(asset.uri);
       setToast({ message: 'Cover photo uploaded successfully.', variant: 'success' });
