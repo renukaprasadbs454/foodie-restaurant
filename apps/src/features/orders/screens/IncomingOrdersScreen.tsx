@@ -28,6 +28,7 @@ import { toUnwrappedApiError } from '../../auth/apiError';
 import { OrderCard } from '../components/OrderCard';
 import { OrderQueueSkeleton } from '../components/OrderQueueSkeleton';
 import { RejectOrderModal } from '../components/RejectOrderModal';
+import { AcceptOrderModal } from '../components/AcceptOrderModal';
 import { IncomingOrderAlertModal } from '../components/IncomingOrderAlertModal';
 import { EmptyOrdersState } from '../components/EmptyOrdersState';
 import { useRestaurantOrdersSubscription } from '../hooks/useRestaurantOrdersSubscription';
@@ -211,10 +212,16 @@ export function IncomingOrdersScreen({ navigation }: Props) {
     return result;
   }, [allOrders, activeStatusFilter, searchQuery, sortOrder]);
 
+  const [acceptingOrder, setAcceptingOrder] = useState<{
+    orderId: string;
+    orderNumber: string;
+  } | null>(null);
+
   const handleTransition = async (
     orderId: string,
     targetStatus: RestaurantTransitionStatus,
     reason?: string,
+    preparationTime?: number,
   ) => {
     if (targetStatus === 'REJECTED') {
       const validated = validateRejectReason(reason ?? '');
@@ -248,6 +255,7 @@ export function IncomingOrdersScreen({ navigation }: Props) {
         }),
       );
       setRejectingOrder(null);
+      setAcceptingOrder(null);
       setToast({
         message: `Order status set to ${targetStatus} (Demo Mode).`,
         variant: 'success',
@@ -260,6 +268,7 @@ export function IncomingOrdersScreen({ navigation }: Props) {
         orderId,
         targetStatus,
         reason: reason ?? null,
+        preparationTime,
       }).unwrap();
 
       // Auto-jump to PREPARING immediately after ACCEPTED
@@ -268,10 +277,12 @@ export function IncomingOrdersScreen({ navigation }: Props) {
           orderId,
           targetStatus: 'PREPARING',
           reason: null,
+          preparationTime,
         }).unwrap();
       }
 
       setRejectingOrder(null);
+      setAcceptingOrder(null);
       setToast({
         message: targetStatus === 'ACCEPTED' ? `Order accepted and moved to PREPARING.` : `Order status updated to ${targetStatus}.`,
         variant: 'success',
@@ -493,7 +504,11 @@ export function IncomingOrdersScreen({ navigation }: Props) {
                   });
                 }}
                 onTransitionStatus={(orderId, targetStatus) => {
-                  void handleTransition(orderId, targetStatus);
+                  if (targetStatus === 'ACCEPTED') {
+                    setAcceptingOrder({ orderId, orderNumber: order.orderNumber });
+                  } else {
+                    void handleTransition(orderId, targetStatus);
+                  }
                 }}
                 onOpenRejectModal={(orderId, orderNumber) => {
                   setRejectingOrder({ orderId, orderNumber });
@@ -515,8 +530,11 @@ export function IncomingOrdersScreen({ navigation }: Props) {
             order={incomingOrderNeedingAction}
             visible={Boolean(incomingOrderNeedingAction)}
             onAccept={(orderId) => {
+              const target = allOrders.find((o) => o.orderId === orderId);
               setDismissedAlertOrderIds((prev) => [...prev, orderId]);
-              void handleTransition(orderId, 'ACCEPTED');
+              if (target) {
+                setAcceptingOrder({ orderId: target.orderId, orderNumber: target.orderNumber });
+              }
             }}
             onReject={(orderId) => {
               const target = allOrders.find((o) => o.orderId === orderId);
@@ -528,6 +546,20 @@ export function IncomingOrdersScreen({ navigation }: Props) {
           />
         );
       })()}
+
+      {/* ACCEPT ORDER MODAL */}
+      <AcceptOrderModal
+        visible={Boolean(acceptingOrder)}
+        orderId={acceptingOrder?.orderId}
+        orderNumber={acceptingOrder?.orderNumber}
+        loading={false}
+        onConfirm={(prepTime) => {
+          if (acceptingOrder) {
+            void handleTransition(acceptingOrder.orderId, 'ACCEPTED', undefined, prepTime);
+          }
+        }}
+        onCancel={() => setAcceptingOrder(null)}
+      />
 
       {/* REJECT ORDER MODAL */}
       <RejectOrderModal

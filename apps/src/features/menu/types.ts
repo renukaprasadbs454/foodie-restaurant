@@ -117,6 +117,7 @@ export type CreateMenuItemRequest = {
   isVeg: boolean;
   packageSize?: string | null;
   gstPct?: number | null;
+  preparationTime?: string;
 };
 
 export type UpdateMenuItemRequest = {
@@ -128,6 +129,7 @@ export type UpdateMenuItemRequest = {
   isVeg: boolean;
   packageSize?: string | null;
   gstPct?: number | null;
+  preparationTime?: string;
 };
 
 export type AddVariantRequest = {

@@ -67,13 +67,14 @@ export const ordersApi = baseApi.injectEndpoints({
       OrderDetail,
       TransitionOrderStatusArg
     >({
-      query: ({ orderId, targetStatus, reason }) => ({
+      query: ({ orderId, targetStatus, reason, preparationTime }) => ({
         url: `/api/v1/orders/${orderId}/status`,
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: {
           targetStatus,
           reason: reason ?? null,
+          ...(preparationTime !== undefined ? { preparationTime } : {}),
         },
       }),
       invalidatesTags: (_result, _error, arg) => [

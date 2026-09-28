@@ -25,6 +25,7 @@ import { OrderStatusBadge } from '../components/OrderStatusBadge';
 import { OrderTimeline } from '../components/OrderTimeline';
 import { RejectOrderModal } from '../components/RejectOrderModal';
 import { SwipeButton } from '../../../components/SwipeButton';
+import { AcceptOrderModal } from '../components/AcceptOrderModal';
 import { useRestaurantOrdersSubscription } from '../hooks/useRestaurantOrdersSubscription';
 import {
   formatMoney,
@@ -58,6 +59,7 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
 
   const { wsActive } = useRestaurantOrdersSubscription(restaurantId ?? null);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [chatVisible, setChatVisible] = useState(false);
 
   const [toast, setToast] = useState<{
@@ -108,6 +110,7 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
   const onTransition = async (
     targetStatus: RestaurantTransitionStatus,
     reason?: string,
+    preparationTime?: number,
   ) => {
     if (isUsingMock) {
       setLocalOrder((prev) => ({
@@ -133,8 +136,9 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
     }
 
     try {
-      await transition({ orderId, targetStatus, reason: reason ?? null }).unwrap();
+      await transition({ orderId, targetStatus, reason: reason ?? null, preparationTime }).unwrap();
       setShowRejectModal(false);
+      setShowAcceptModal(false);
       setToast({ message: `Status updated to ${targetStatus}.`, variant: 'success' });
       void query.refetch();
     } catch (error) {
@@ -398,6 +402,10 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
                           setShowRejectModal(true);
                           return;
                         }
+                        if (action === 'ACCEPTED') {
+                          setShowAcceptModal(true);
+                          return;
+                        }
                         void onTransition(action);
                       }}
                     />
@@ -418,6 +426,18 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
           void onTransition('REJECTED', reason);
         }}
         onCancel={() => setShowRejectModal(false)}
+      />
+
+      {/* ACCEPT MODAL */}
+      <AcceptOrderModal
+        visible={showAcceptModal}
+        orderId={order?.orderId}
+        orderNumber={order?.orderNumber}
+        loading={false}
+        onConfirm={(prepTime) => {
+          void onTransition('ACCEPTED', undefined, prepTime);
+        }}
+        onCancel={() => setShowAcceptModal(false)}
       />
 
       <Toast

@@ -77,7 +77,7 @@
       "apiBaseUrl": "https://api.foodie.kwiko.org",
       "wsUrl": "wss://api.foodie.kwiko.org/ws",
       "eas": {
-        "projectId": "af06dc02-5eaf-4808-b684-3c53c7e30153"
+        "projectId": "bfdbbd6c-eaae-47ca-8fd8-2d0e015c6ef3"
       }
     }
   }

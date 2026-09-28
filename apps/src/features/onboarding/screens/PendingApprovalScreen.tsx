@@ -22,6 +22,8 @@ import { clearIsNewUser } from '../../auth/authSlice';
 import { OnboardingStepper } from '../components/OnboardingStepper';
 import { setRestaurantStatus } from '../restaurantOnboardingSlice';
 import type { OnboardingStackParamList } from '../../../navigation/types';
+import { logoutRestaurant } from '../../auth/session';
+import { store } from '../../../store/store';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'PendingApproval'>;
 
@@ -243,6 +245,29 @@ export function PendingApprovalScreen({ navigation }: Props) {
             </Pressable>
           </View>
         ) : null}
+
+        {/* Global Logout Button */}
+        <View style={{ marginTop: 24, paddingVertical: 12 }}>
+          <Pressable
+            style={({ pressed }) => [
+              {
+                backgroundColor: '#FFFFFF',
+                borderRadius: 16,
+                paddingVertical: 14,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+              },
+              pressed && { backgroundColor: '#F1F5F9' },
+            ]}
+            onPress={() => void logoutRestaurant(dispatch, store.getState)}
+          >
+            <Text style={{ color: '#EF4444', fontSize: 15, fontWeight: '800' }}>
+              🚪 Sign Out
+            </Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </View>
   );

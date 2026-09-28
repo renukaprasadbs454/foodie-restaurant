@@ -69,6 +69,7 @@ export type TransitionOrderStatusArg = {
   orderId: string;
   targetStatus: RestaurantTransitionStatus;
   reason?: string | null;
+  preparationTime?: number;
 };
 
 /** Restaurant list sort allowlist — placedAt only. */

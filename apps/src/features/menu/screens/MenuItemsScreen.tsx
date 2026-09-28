@@ -487,6 +487,7 @@ export function MenuItemsScreen({ navigation }: Props) {
             basePrice: priceNum,
             isVeg: formFoodType === 'VEG',
             packageSize: formPackageSize,
+            preparationTime: formPrepTime,
             gstPct: formGstPct ? Number(formGstPct) : null,
           }).unwrap();
 
@@ -541,6 +542,7 @@ export function MenuItemsScreen({ navigation }: Props) {
             basePrice: priceNum,
             isVeg: formFoodType === 'VEG',
             packageSize: formPackageSize,
+            preparationTime: formPrepTime,
             gstPct: formGstPct ? Number(formGstPct) : null,
           }).unwrap();
 

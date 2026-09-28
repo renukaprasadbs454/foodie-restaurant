@@ -53,6 +53,9 @@ export const menuApi = baseApi.injectEndpoints({
           description: body.description ?? null,
           basePrice: body.basePrice,
           isVeg: body.isVeg,
+          preparationTime: body.preparationTime,
+          packageSize: body.packageSize,
+          gstPct: body.gstPct,
         },
       }),
       invalidatesTags: [{ type: 'Menu', id: 'LIST' }],
@@ -61,7 +64,7 @@ export const menuApi = baseApi.injectEndpoints({
       Omit<MenuItem, 'variants'> & { categoryId: string },
       UpdateMenuItemRequest
     >({
-      query: ({ menuItemId, categoryId, name, description, basePrice, isVeg }) => ({
+      query: ({ menuItemId, categoryId, name, description, basePrice, isVeg, preparationTime, packageSize, gstPct }) => ({
         url: `/api/v1/menu/items/${menuItemId}`,
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -71,6 +74,9 @@ export const menuApi = baseApi.injectEndpoints({
           description: description ?? null,
           basePrice,
           isVeg,
+          preparationTime,
+          packageSize,
+          gstPct,
         },
       }),
       invalidatesTags: [{ type: 'Menu', id: 'LIST' }],
