@@ -35,10 +35,10 @@ export function AcceptOrderModal({
         skip: !visible || !restaurantId,
     });
 
-    // Auto-calculate the default prep time from order items whenever orderDetail or menuData is available
     useEffect(() => {
         if (visible && orderDetail?.items && menuData?.categories) {
-            let maxPrep = 20;
+            let totalPrep = 0;
+            let count = 0;
 
             for (const orderItem of orderDetail.items) {
                 for (const cat of menuData.categories) {
@@ -51,13 +51,20 @@ export function AcceptOrderModal({
                         } else if (typeof ptStr === 'number') {
                             val = ptStr;
                         }
-                        if (val > maxPrep) {
-                            maxPrep = val;
-                        }
+                        totalPrep += (val * orderItem.quantity);
+                        count += orderItem.quantity;
                     }
                 }
             }
-            setPrepTime(maxPrep);
+            if (count > 0) {
+                // Average based on total items
+                const avgPrepTime = Math.round(totalPrep / count);
+                // Round up or down to nearest 5 for nicer UI increments
+                const roundedToFive = Math.round(avgPrepTime / 5) * 5;
+                setPrepTime(Math.max(5, roundedToFive));
+            } else {
+                setPrepTime(20);
+            }
         } else if (visible) {
             setPrepTime(20);
         }
