@@ -38,6 +38,7 @@ import { DemoModeIndicator } from '../../../components/DemoModeIndicator';
 import { MOCK_CONFIG } from '../../../config/mockConfig';
 import { getMockDashboardSummary, getMockRestaurantProfile } from '../../../mock';
 import { IncomingOrderAlertModal } from '../components/IncomingOrderAlertModal';
+import { AcceptOrderModal } from '../components/AcceptOrderModal';
 import { RejectOrderModal } from '../components/RejectOrderModal';
 import { OrderCard } from '../components/OrderCard';
 
@@ -74,6 +75,7 @@ export function DashboardScreen({ navigation }: Props) {
   const [transitionStatus] = useTransitionOrderStatusMutation();
   const [dismissedAlertOrderIds, setDismissedAlertOrderIds] = useState<string[]>([]);
   const [rejectingOrder, setRejectingOrder] = useState<{ orderId: string; orderNumber: string } | null>(null);
+  const [acceptingOrder, setAcceptingOrder] = useState<{ orderId: string; orderNumber: string } | null>(null);
   const [manualRefresh, setManualRefresh] = useState(false);
 
   useEffect(() => {
@@ -579,11 +581,13 @@ export function DashboardScreen({ navigation }: Props) {
                     });
                   }}
                   onTransitionStatus={async (orderId, targetStatus) => {
+                    if (targetStatus === 'ACCEPTED') {
+                      const target = orders.find((o) => o.orderId === orderId);
+                      if (target) setAcceptingOrder({ orderId, orderNumber: target.orderNumber });
+                      return;
+                    }
                     try {
                       await transitionStatus({ orderId, targetStatus }).unwrap();
-                      if (targetStatus === 'ACCEPTED') {
-                        await transitionStatus({ orderId, targetStatus: 'PREPARING' }).unwrap();
-                      }
                     } catch (e) {
                       // Error handled by mutation
                     }
@@ -609,12 +613,12 @@ export function DashboardScreen({ navigation }: Props) {
             <IncomingOrderAlertModal
               order={incomingOrderNeedingAction}
               visible={Boolean(incomingOrderNeedingAction)}
-              onAccept={async (orderId) => {
+              onAccept={(orderId) => {
+                const target = orders.find((o) => o.orderId === orderId);
                 setDismissedAlertOrderIds((prev) => [...prev, orderId]);
-                try {
-                  await transitionStatus({ orderId, targetStatus: 'ACCEPTED' }).unwrap();
-                  void activeQuery.refetch();
-                } catch (e) { }
+                if (target) {
+                  setAcceptingOrder({ orderId: target.orderId, orderNumber: target.orderNumber });
+                }
               }}
               onReject={(orderId) => {
                 const target = orders.find((o) => o.orderId === orderId);
@@ -623,6 +627,25 @@ export function DashboardScreen({ navigation }: Props) {
                   setRejectingOrder({ orderId: target.orderId, orderNumber: target.orderNumber });
                 }
               }}
+            />
+
+            <AcceptOrderModal
+              visible={Boolean(acceptingOrder)}
+              orderId={acceptingOrder?.orderId}
+              orderNumber={acceptingOrder?.orderNumber}
+              loading={false}
+              onConfirm={(prepTime) => {
+                if (acceptingOrder) {
+                  void transitionStatus({
+                    orderId: acceptingOrder.orderId,
+                    targetStatus: 'ACCEPTED',
+                    prepTimeAllocated: prepTime,
+                  }).unwrap();
+                  setAcceptingOrder(null);
+                  void activeQuery.refetch();
+                }
+              }}
+              onCancel={() => setAcceptingOrder(null)}
             />
 
             <RejectOrderModal
