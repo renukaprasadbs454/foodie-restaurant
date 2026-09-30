@@ -1,0 +1,8 @@
+﻿src/features/orders/screens/DashboardScreen.tsx(661,21): error TS2353: Object literal may only specify known properties, and 'prepTimeAllocated' does not exist in type 'TransitionOrderStatusArg'.
+src/features/profile/screens/RestaurantProfileScreen.tsx(678,15): error TS2322: Type '{ label: string; accessibilityLabel: string; variant: "secondary"; style: { borderColor: string; }; textStyle: { color: string; }; onPress: () => undefined; }' is not assignable to type 'IntrinsicAttributes & Omit<PressableProps, "style" | "children"> & { label: string; accessibilityLabel: string; accessibilityHint?: string | undefined; loading?: boolean | undefined; variant?: "primary" | ... 2 more ... | undefined; style?: StyleProp<...>; }'.
+  Property 'textStyle' does not exist on type 'IntrinsicAttributes & Omit<PressableProps, "style" | "children"> & { label: string; accessibilityLabel: string; accessibilityHint?: string | undefined; loading?: boolean | undefined; variant?: "primary" | ... 2 more ... | undefined; style?: StyleProp<...>; }'.
+src/features/profile/screens/SettlementHistoryScreen.tsx(106,18): error TS7006: Parameter 'sum' implicitly has an 'any' type.
+src/features/profile/screens/SettlementHistoryScreen.tsx(106,23): error TS7006: Parameter 's' implicitly has an 'any' type.
+src/features/profile/screens/SettlementHistoryScreen.tsx(110,102): error TS2367: This comparison appears to be unintentional because the types '"COMPLETED" | undefined' and '"PROCESSING"' have no overlap.
+src/features/profile/screens/SettlementHistoryScreen.tsx(111,18): error TS7006: Parameter 'sum' implicitly has an 'any' type.
+src/features/profile/screens/SettlementHistoryScreen.tsx(111,23): error TS7006: Parameter 's' implicitly has an 'any' type.

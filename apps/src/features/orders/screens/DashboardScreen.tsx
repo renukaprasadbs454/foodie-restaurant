@@ -41,6 +41,8 @@ import { IncomingOrderAlertModal } from '../components/IncomingOrderAlertModal';
 import { AcceptOrderModal } from '../components/AcceptOrderModal';
 import { RejectOrderModal } from '../components/RejectOrderModal';
 import { OrderCard } from '../components/OrderCard';
+import { Feather } from '@expo/vector-icons';
+import { RestaurantSupportModal } from '../../profile/components/RestaurantSupportModal';
 
 type Props = NativeStackScreenProps<OrdersStackParamList, 'Dashboard'>;
 
@@ -77,6 +79,7 @@ export function DashboardScreen({ navigation }: Props) {
   const [rejectingOrder, setRejectingOrder] = useState<{ orderId: string; orderNumber: string } | null>(null);
   const [acceptingOrder, setAcceptingOrder] = useState<{ orderId: string; orderNumber: string } | null>(null);
   const [manualRefresh, setManualRefresh] = useState(false);
+  const [supportVisible, setSupportVisible] = useState(false);
 
   useEffect(() => {
     if (profileQuery.data?.restaurantId && !storedRestaurantId) {
@@ -336,6 +339,22 @@ export function DashboardScreen({ navigation }: Props) {
                 <Text style={{ fontSize: 24 }}>🍳</Text>
               </View>
             )}
+
+            <Pressable
+              onPress={() => setSupportVisible(true)}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginLeft: 12,
+              }}
+              accessibilityLabel="Open Admin Support Chat"
+            >
+              <Feather name="headphones" size={20} color="#FFFFFF" />
+            </Pressable>
           </View>
 
           {/* Connection / Channel Status */}
@@ -639,7 +658,7 @@ export function DashboardScreen({ navigation }: Props) {
                   void transitionStatus({
                     orderId: acceptingOrder.orderId,
                     targetStatus: 'ACCEPTED',
-                    prepTimeAllocated: prepTime,
+                    preparationTime: prepTime,
                   }).unwrap();
                   setAcceptingOrder(null);
                   void activeQuery.refetch();
@@ -664,6 +683,12 @@ export function DashboardScreen({ navigation }: Props) {
                 }
               }}
               onCancel={() => setRejectingOrder(null)}
+            />
+
+            <RestaurantSupportModal
+              visible={supportVisible}
+              onClose={() => setSupportVisible(false)}
+              restaurantName={displayRestaurantName}
             />
           </>
         );

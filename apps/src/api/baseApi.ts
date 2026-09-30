@@ -24,6 +24,8 @@ export const baseApi = createBaseApi({
     'Menu',
     'Review',
     'Notification',
+    'SupportConversation',
+    'SupportMessage',
   ] as const,
   getAccessToken: (state: unknown): string | null =>
     selectAccessToken(state as AuthRoot),
