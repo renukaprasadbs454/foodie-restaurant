@@ -35,7 +35,11 @@ export function OrderStatusBadge({ status, size = 'md' }: Props) {
     case 'WAITING_FOR_DELIVERY_PARTNER':
     case 'ASSIGNED':
       tone = 'success';
-      label = status === 'READY_FOR_PICKUP' ? 'READY FOR PICKUP' : status.replace(/_/g, ' ');
+      label = status === 'READY_FOR_PICKUP'
+        ? 'READY FOR PICKUP'
+        : ['WAITING_FOR_DELIVERY_PARTNER', 'ASSIGNED'].includes(status)
+          ? 'RIDER ASSIGNED'
+          : status.replace(/_/g, ' ');
       icon = '📦';
       break;
     case 'DELIVERED':
