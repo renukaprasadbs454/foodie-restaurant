@@ -1,16 +1,17 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, View, useWindowDimensions, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, useTheme } from 'foodie-shared-rn';
+import { Feather } from '@expo/vector-icons';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { selectRestaurantId } from '../features/onboarding/restaurantOnboardingSlice';
 import { logoutRestaurant } from '../features/auth/session';
 import { store } from '../store/store';
 import { useGetRestaurantProfileQuery, useToggleRestaurantStatusMutation } from '../api/endpoints/restaurantsApi';
 import { useGetNotificationsQuery } from '../api/endpoints/notificationsApi';
+import { RestaurantSupportModal } from '../features/profile/components/RestaurantSupportModal';
 
 let isAutoOverridden = false;
-
 
 type Props = {
   title?: string;
@@ -39,6 +40,7 @@ export function RestaurantHeader({
   const dispatch = useAppDispatch();
   const { data: profile } = useGetRestaurantProfileQuery(undefined, { skip: !restaurantId });
   const [toggleStatus] = useToggleRestaurantStatusMutation();
+  const [supportVisible, setSupportVisible] = useState(false);
 
   const notificationsQuery = useGetNotificationsQuery(
     { unreadOnly: true, page: 0, size: 20 },
@@ -58,6 +60,7 @@ export function RestaurantHeader({
     if (!profile) return;
     const openMatch = profile.description?.match(/\[OPEN:(.*?)\]/i);
     const closeMatch = profile.description?.match(/\[CLOSE:(.*?)\]/i);
+
     if (!openMatch || !closeMatch) return;
 
     const parseTime = (val: string) => {
@@ -145,9 +148,7 @@ export function RestaurantHeader({
                 backgroundColor: pressed ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
               }]}
             >
-              <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' }}>
-                ←
-              </Text>
+              <Feather name="arrow-left" size={20} color="#FFFFFF" />
             </Pressable>
           ) : null}
 
@@ -194,7 +195,7 @@ export function RestaurantHeader({
           </View>
         </View>
 
-        {/* RIGHT ACTION CONTROLS: ONLINE STATUS, BELL & PROFILE AVATAR */}
+        {/* RIGHT ACTION CONTROLS: ONLINE STATUS, LIVE SUPPORT & NOTIFICATION BELL */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.sm }}>
           {/* ONLINE / OFFLINE TOGGLE PILL */}
           <Pressable
@@ -226,7 +227,7 @@ export function RestaurantHeader({
               flexDirection: 'row',
               alignItems: 'center',
               paddingHorizontal: 10,
-              paddingVertical: 4,
+              paddingVertical: 5,
               borderRadius: 12,
               gap: 6,
               backgroundColor: isOnline ? '#064E3B' : '#7F1D1D',
@@ -255,22 +256,43 @@ export function RestaurantHeader({
             </Text>
           </Pressable>
 
+          {/* LIVE SUPPORT AGENT BUTTON */}
+          <Pressable
+            onPress={() => setSupportVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Open Admin Support Chat"
+            style={({ pressed }) => [{
+              width: 38,
+              height: 38,
+              borderRadius: 19,
+              backgroundColor: pressed ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.15)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 1,
+              borderColor: 'rgba(255, 255, 255, 0.25)',
+            }]}
+          >
+            <Feather name="headphones" size={18} color="#FFFFFF" />
+          </Pressable>
+
           {/* NOTIFICATION BELL ICON WITH AMBER DOT */}
           <Pressable
             onPress={handleNotificationPress}
             accessibilityRole="button"
             accessibilityLabel="Notifications"
             style={({ pressed }) => [{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              backgroundColor: pressed ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+              width: 38,
+              height: 38,
+              borderRadius: 19,
+              backgroundColor: pressed ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.15)',
               alignItems: 'center',
               justifyContent: 'center',
               position: 'relative',
+              borderWidth: 1,
+              borderColor: 'rgba(255, 255, 255, 0.25)',
             }]}
           >
-            <Text style={{ fontSize: 20 }}>🔔</Text>
+            <Feather name="bell" size={18} color={unreadCount > 0 ? '#F59E0B' : '#FFFFFF'} />
             {unreadCount > 0 && (
               <View
                 style={{
@@ -280,27 +302,32 @@ export function RestaurantHeader({
                   backgroundColor: '#EF4444',
                   borderRadius: 12,
                   paddingHorizontal: 5,
-                  minWidth: 20,
-                  height: 20,
+                  minWidth: 18,
+                  height: 18,
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderWidth: 1.5,
                   borderColor: BRAND_PRIMARY,
                 }}
               >
-                <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' }}>
+                <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' }}>
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </Text>
               </View>
             )}
           </Pressable>
-
         </View>
       </View>
 
       {/* SUBTLE AMBER BOTTOM ACCENT LINE */}
       <View style={{ height: 2, backgroundColor: BRAND_ACCENT }} />
+
+      {/* RESTAURANT ADMIN SUPPORT MODAL */}
+      <RestaurantSupportModal
+        visible={supportVisible}
+        onClose={() => setSupportVisible(false)}
+        restaurantName={profile?.name || displayTitle || 'Restaurant Partner'}
+      />
     </View>
   );
 }
-
