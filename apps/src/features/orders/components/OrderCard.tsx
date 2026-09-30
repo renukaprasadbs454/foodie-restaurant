@@ -33,6 +33,7 @@ export function OrderCard({
 }: Props) {
   const { tokens } = useTheme();
   const [chatVisible, setChatVisible] = React.useState(false);
+  const [locallyMarkedReady, setLocallyMarkedReady] = React.useState(false);
 
   // Optionally fetch full OrderDetail for line items breakdown if available
   const orderDetailsQuery = useGetOrderQuery(order.orderId, {
@@ -43,6 +44,7 @@ export function OrderCard({
   const items = detail?.items ?? [];
   const status = order.status;
   const isPending = ['CONFIRMED', 'PENDING', 'PLACED'].includes(status);
+  const hasBeenMarkedReady = detail?.orderStatusEvents?.some((e: any) => e.toStatus === 'READY_FOR_PICKUP') ?? false;
   const actions = restaurantActionsForStatus(status);
 
   return (
@@ -223,7 +225,7 @@ export function OrderCard({
               onSwipeSuccess={() => onOpenRejectModal(order.orderId, order.orderNumber)}
             />
           </View>
-        ) : ['ACCEPTED', 'PREPARING'].includes(status) ? (
+        ) : ['ACCEPTED', 'PREPARING'].includes(status) || (['ASSIGNED', 'WAITING_FOR_DELIVERY_PARTNER'].includes(status) && !hasBeenMarkedReady && !locallyMarkedReady && status !== 'READY_FOR_PICKUP') ? (
           <View style={{ width: '100%', gap: tokens.spacing.sm }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#EFF6FF', paddingVertical: 8, borderRadius: 8, gap: 6 }}>
               <Text style={{ fontSize: 13 }}>🟢</Text>
@@ -232,10 +234,13 @@ export function OrderCard({
             <SwipeButton
               title="Ready for Pickup"
               backgroundColor="#16A34A"
-              onSwipeSuccess={() => onTransitionStatus(order.orderId, 'READY_FOR_PICKUP')}
+              onSwipeSuccess={() => {
+                setLocallyMarkedReady(true);
+                onTransitionStatus(order.orderId, 'READY_FOR_PICKUP');
+              }}
             />
           </View>
-        ) : status === 'READY_FOR_PICKUP' ? (
+        ) : status === 'READY_FOR_PICKUP' || locallyMarkedReady || (['ASSIGNED', 'WAITING_FOR_DELIVERY_PARTNER'].includes(status) && hasBeenMarkedReady) ? (
           <View style={{ width: '100%', gap: tokens.spacing.sm }}>
             <SwipeButton
               title="Hand Over (Collected)"

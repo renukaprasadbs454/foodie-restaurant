@@ -132,16 +132,16 @@ export function IncomingOrderAlertModal({
                         gap: tokens.spacing.sm,
                     }}
                 >
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <View style={{ flex: 1, paddingRight: 12 }}>
                             <Text variant="caption" color={tokens.color.textSecondary}>Order Number</Text>
                             <Text variant="heading2" style={{ color: BRAND_PRIMARY, fontWeight: 'bold' }}>
                                 {order.orderNumber}
                             </Text>
                         </View>
-                        <View style={{ alignItems: 'flex-end' }}>
+                        <View style={{ alignItems: 'flex-end', flexShrink: 0, maxWidth: '45%' }}>
                             <Text variant="caption" color={tokens.color.textSecondary}>Customer Name</Text>
-                            <Text variant="label" style={{ color: tokens.color.textPrimary, fontWeight: 'bold', fontSize: 15 }}>
+                            <Text variant="label" numberOfLines={1} ellipsizeMode="tail" style={{ color: tokens.color.textPrimary, fontWeight: 'bold', fontSize: 15 }}>
                                 👤 {customerName}
                             </Text>
                         </View>

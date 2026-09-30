@@ -32,8 +32,10 @@ export function OrderStatusBadge({ status, size = 'md' }: Props) {
       icon = '🍳';
       break;
     case 'READY_FOR_PICKUP':
+    case 'WAITING_FOR_DELIVERY_PARTNER':
+    case 'ASSIGNED':
       tone = 'success';
-      label = 'READY FOR PICKUP';
+      label = status === 'READY_FOR_PICKUP' ? 'READY FOR PICKUP' : status.replace(/_/g, ' ');
       icon = '📦';
       break;
     case 'DELIVERED':
