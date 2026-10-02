@@ -8,6 +8,7 @@ import {
   TextInput,
   View,
   Platform,
+  Alert,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as Location from 'expo-location';
@@ -24,6 +25,7 @@ import { clearIsNewUser } from '../../auth/authSlice';
 import { toUnwrappedApiError } from '../../auth/apiError';
 import { OnboardingStepper } from '../components/OnboardingStepper';
 import { setRestaurantCreated } from '../restaurantOnboardingSlice';
+import { useGetZonesQuery } from '../../../api/endpoints/locationApi';
 import { logoutRestaurant } from '../../auth/session';
 import { store } from '../../../store/store';
 import {
@@ -52,11 +54,35 @@ type Props = NativeStackScreenProps<
 const BRAND_PRIMARY = '#14532D'; // Deep Emerald Green
 const BRAND_ACCENT = '#F59E0B';  // Warm Gold / Amber
 
+// Ray-Casting algorithm for point in polygon
+function isPointInPolygon(point: { lat: number; lng: number }, vs: { lat: number; lng: number }[]) {
+  let x = point.lng, y = point.lat;
+  let inside = false;
+  for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+    let xi = vs[i].lng, yi = vs[i].lat;
+    let xj = vs[j].lng, yj = vs[j].lat;
+
+    let intersect = ((yi > y) !== (yj > y))
+      && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function parseBoundaries(boundaryStr: string) {
+  if (!boundaryStr) return [];
+  return boundaryStr.split('|').map(s => {
+    const [lat, lng] = s.trim().split(',').map(Number);
+    return { lat, lng };
+  });
+}
+
 export function RestaurantRegistrationScreen({ navigation }: Props) {
   const { isConnected } = useConnectivity();
   const dispatch = useAppDispatch();
   const insets = useSafeAreaInsets();
   const [register, registerState] = useRegisterRestaurantMutation();
+  const { data: zonesResponse } = useGetZonesQuery();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -165,6 +191,8 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+
+
   const toggleCuisine = (cuisine: CuisineType) => {
     setCuisineTypes((prev) =>
       prev.includes(cuisine)
@@ -197,9 +225,90 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
       });
       return;
     }
+
+    // Zone Validation
+    const zones = zonesResponse?.data || [];
+    const pt = { lat: parseFloat(latitude), lng: parseFloat(longitude) };
+
+    const getDistanceFromLatLonInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+      const R = 6371; // Radius of the earth in km
+      const dLat = (lat2 - lat1) * (Math.PI / 180);
+      const dLon = (lon2 - lon1) * (Math.PI / 180);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c; // Distance in km
+    };
+
+    let matchedZone = null;
+    for (const zone of zones) {
+      if (!zone.restaurantEnabled) continue;
+
+      let isMatch = false;
+
+      // 1. Validate by Admin Entered Radius Range
+      if (zone.latitude && zone.longitude && zone.radiusKm) {
+        const dist = getDistanceFromLatLonInKm(pt.lat, pt.lng, zone.latitude, zone.longitude);
+        if (dist <= zone.radiusKm) {
+          isMatch = true;
+        }
+      }
+
+      // 2. Fallback to Polygon Validation
+      if (!isMatch && zone.polygonCoordinates) {
+        const poly = parseBoundaries(zone.polygonCoordinates);
+        if (poly.length >= 3 && isPointInPolygon(pt, poly)) {
+          isMatch = true;
+        }
+      }
+
+      if (isMatch) {
+        matchedZone = zone;
+        break;
+      }
+    }
+
+    if (matchedZone) {
+      if (Platform.OS === 'web') {
+        const confirmed = window.confirm(
+          `Entered location comes under this zone: ${matchedZone.zoneName}.\nDo you want to proceed?`
+        );
+        if (!confirmed) return;
+        proceedToRegister(validated.value);
+      } else {
+        Alert.alert(
+          'Zone Confirmation',
+          `Entered location comes under this zone: ${matchedZone.zoneName}. Do you want to proceed?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Confirm',
+              onPress: () => {
+                proceedToRegister(validated.value);
+              },
+            },
+          ]
+        );
+      }
+    } else {
+      if (Platform.OS === 'web') {
+        window.alert('Your restaurant is out of the zone. We will come soon to your location.');
+      } else {
+        Alert.alert(
+          'Out of Service Area',
+          'Your restaurant is out of the zone. We will come soon to your location.',
+          [{ text: 'OK' }]
+        );
+      }
+    }
+  };
+
+  const proceedToRegister = async (registrationData: any) => {
     trackAnalyticsEvent('registration_submitted');
     try {
-      const result = await register(validated.value).unwrap();
+      const result = await register(registrationData).unwrap();
       const restaurantId = result?.restaurantId || (result as any)?.data?.restaurantId;
       if (!restaurantId) {
         // Fallback check if profile was already created
@@ -395,10 +504,22 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
               ref={mapRef}
               style={{ flex: 1, height: '100%', width: '100%' }}
               region={mapRegion}
-              onRegionChangeComplete={(r) => {
+              onRegionChangeComplete={async (r) => {
                 setMapRegion(r);
                 setLatitude(r.latitude.toFixed(6));
                 setLongitude(r.longitude.toFixed(6));
+                try {
+                  const geocode = await Location.reverseGeocodeAsync({ latitude: r.latitude, longitude: r.longitude });
+                  if (geocode.length > 0) {
+                    const addr = geocode[0];
+                    if (addr.city) setCity(addr.city);
+                    if (addr.postalCode) setPincode(addr.postalCode);
+                    if (addr.street) setLine1(addr.street);
+                    if (addr.name && addr.name !== addr.street) setLine2(addr.name);
+                  }
+                } catch (e) {
+                  // ignore
+                }
               }}
             >
               <Marker coordinate={{ latitude: mapRegion.latitude, longitude: mapRegion.longitude }} pinColor="#14532D" title="Restaurant Outlet" />
@@ -410,6 +531,8 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
               </View>
             )}
           </View>
+
+
 
           <Pressable
             onPress={() => void fetchExactLocation()}
