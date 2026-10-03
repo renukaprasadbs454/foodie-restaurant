@@ -271,12 +271,20 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
     }
 
     if (matchedZone) {
+      const finalPayload = {
+        ...validated.value,
+        address: {
+          ...validated.value.address,
+          city: matchedZone.cityName
+        }
+      };
+
       if (Platform.OS === 'web') {
         const confirmed = window.confirm(
           `Entered location comes under this zone: ${matchedZone.zoneName}.\nDo you want to proceed?`
         );
         if (!confirmed) return;
-        proceedToRegister(validated.value);
+        proceedToRegister(finalPayload);
       } else {
         Alert.alert(
           'Zone Confirmation',
@@ -286,7 +294,7 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
             {
               text: 'Confirm',
               onPress: () => {
-                proceedToRegister(validated.value);
+                proceedToRegister(finalPayload);
               },
             },
           ]
