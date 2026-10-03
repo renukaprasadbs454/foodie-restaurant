@@ -227,7 +227,7 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
     }
 
     // Zone Validation
-    const zones = zonesResponse?.data || [];
+    const zones = Array.isArray(zonesResponse) ? zonesResponse : [];
     const pt = { lat: parseFloat(latitude), lng: parseFloat(longitude) };
 
     const getDistanceFromLatLonInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {

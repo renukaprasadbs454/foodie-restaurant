@@ -33,7 +33,7 @@ export const locationApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: [{ type: 'Restaurant', id: 'LOCATION' }],
     }),
-    getZones: builder.query<{ data: LocationZoneDto[] }, void>({
+    getZones: builder.query<LocationZoneDto[], void>({
       query: () => '/api/v1/admin/location/zones',
       keepUnusedDataFor: 600,
     }),
