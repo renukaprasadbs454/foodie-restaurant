@@ -673,9 +673,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
             <Button
               label="Logout"
               accessibilityLabel="Logout"
-              variant="secondary"
-              style={{ borderColor: '#DC2626' }}
-              textStyle={{ color: '#DC2626' }}
+              variant="danger"
               onPress={() => void logoutRestaurant(dispatch, store.getState)}
             />
           </>
