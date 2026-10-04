@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, View, useWindowDimensions, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, useTheme } from 'foodie-shared-rn';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { selectRestaurantId } from '../features/onboarding/restaurantOnboardingSlice';
 import { logoutRestaurant } from '../features/auth/session';

@@ -19,13 +19,7 @@ try {
     }
 } catch (e) { }
 
-try {
-    const priv = require('react-native/src/private/featureflags/ReactNativeFeatureFlags');
-    if (priv) {
-        if (typeof priv.enableOptimisedVirtualizedCells !== 'function') priv.enableOptimisedVirtualizedCells = () => false;
-        if (priv.default && typeof priv.default.enableOptimisedVirtualizedCells !== 'function') priv.default.enableOptimisedVirtualizedCells = () => false;
-    }
-} catch (e) { }
+
 
 if (typeof document !== 'undefined') {
     const style = document.createElement('style');

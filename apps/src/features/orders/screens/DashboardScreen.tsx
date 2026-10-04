@@ -41,7 +41,7 @@ import { IncomingOrderAlertModal } from '../components/IncomingOrderAlertModal';
 import { AcceptOrderModal } from '../components/AcceptOrderModal';
 import { RejectOrderModal } from '../components/RejectOrderModal';
 import { OrderCard } from '../components/OrderCard';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 
 
 type Props = NativeStackScreenProps<OrdersStackParamList, 'Dashboard'>;

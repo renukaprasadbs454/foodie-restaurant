@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -89,7 +90,21 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
   const [restaurantType, setRestaurantType] = useState<
     'VEGETARIAN' | 'NON_VEGETARIAN' | 'BOTH'
   >('BOTH');
-  const [cuisineTypes, setCuisineTypes] = useState<CuisineType[]>([]);
+  const [cuisineTypes, setCuisineTypes] = useState<string[]>([]);
+  const [customCuisines, setCustomCuisines] = useState<string[]>([]);
+  const [customCuisineInput, setCustomCuisineInput] = useState('');
+  const [isCustomInputFocused, setIsCustomInputFocused] = useState(false);
+
+  const otherSelected = cuisineTypes.includes('OTHER');
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: otherSelected ? 1 : 0,
+      duration: 250,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  }, [otherSelected, fadeAnim]);
   const [line1, setLine1] = useState('');
   const [line2, setLine2] = useState('');
   const [city, setCity] = useState('');
@@ -193,12 +208,32 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
 
 
 
-  const toggleCuisine = (cuisine: CuisineType) => {
+  const toggleCuisine = (cuisine: string) => {
     setCuisineTypes((prev) =>
       prev.includes(cuisine)
         ? prev.filter((c) => c !== cuisine)
         : [...prev, cuisine],
     );
+  };
+
+  const handleAddCustomCuisine = () => {
+    const trimmed = customCuisineInput.trim();
+    if (!trimmed) return;
+
+    const normalized = trimmed.toUpperCase();
+
+    if (
+      !customCuisines.includes(normalized) &&
+      !(CUISINE_TYPES as readonly string[]).includes(normalized)
+    ) {
+      setCustomCuisines((prev) => [...prev, normalized]);
+    }
+
+    if (!cuisineTypes.includes(normalized)) {
+      setCuisineTypes((prev) => [...prev, normalized]);
+    }
+
+    setCustomCuisineInput('');
   };
 
   const onSubmit = async () => {
@@ -474,7 +509,7 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
           <View style={styles.fieldGroup}>
             <Text style={styles.inputLabel}>Cuisines Served *</Text>
             <View style={styles.cuisineGrid}>
-              {CUISINE_TYPES.map((cuisine) => {
+              {CUISINE_TYPES.filter((c) => c !== 'OTHER').map((cuisine) => {
                 const selected = cuisineTypes.includes(cuisine);
                 return (
                   <Pressable
@@ -497,7 +532,112 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
                   </Pressable>
                 );
               })}
+
+              {customCuisines.map((cuisine) => {
+                const selected = cuisineTypes.includes(cuisine);
+                return (
+                  <Pressable
+                    key={`custom-${cuisine}`}
+                    onPress={() => toggleCuisine(cuisine)}
+                    style={[
+                      styles.cuisineChip,
+                      selected && styles.cuisineChipSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.cuisineChipText,
+                        selected && styles.cuisineChipTextSelected,
+                      ]}
+                    >
+                      {selected ? '✓ ' : ''}
+                      {cuisine}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+
+              {(() => {
+                const selected = cuisineTypes.includes('OTHER');
+                return (
+                  <Pressable
+                    key="OTHER"
+                    onPress={() => toggleCuisine('OTHER')}
+                    style={[
+                      styles.cuisineChip,
+                      selected && styles.cuisineChipSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.cuisineChipText,
+                        selected && styles.cuisineChipTextSelected,
+                      ]}
+                    >
+                      {selected ? '✓ ' : ''}
+                      OTHER
+                    </Text>
+                  </Pressable>
+                );
+              })()}
             </View>
+
+            {otherSelected && (
+              <Animated.View
+                style={[
+                  styles.customCuisineWrapper,
+                  {
+                    opacity: fadeAnim,
+                    transform: [
+                      {
+                        translateY: fadeAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-8, 0],
+                        }),
+                      },
+                      {
+                        scale: fadeAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.97, 1],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.customCuisineInputContainer,
+                    isCustomInputFocused && styles.customCuisineInputContainerFocused,
+                  ]}
+                >
+                  <Text style={styles.customCuisineIcon}>✨</Text>
+                  <TextInput
+                    style={styles.customCuisineInput}
+                    placeholder="Enter your cuisine"
+                    placeholderTextColor="#94A3B8"
+                    value={customCuisineInput}
+                    onChangeText={setCustomCuisineInput}
+                    onFocus={() => setIsCustomInputFocused(true)}
+                    onBlur={() => setIsCustomInputFocused(false)}
+                    onSubmitEditing={handleAddCustomCuisine}
+                    returnKeyType="done"
+                    autoCapitalize="words"
+                  />
+                  <Pressable
+                    onPress={handleAddCustomCuisine}
+                    style={({ pressed }) => [
+                      styles.addCuisineButton,
+                      pressed && styles.addCuisineButtonPressed,
+                      !customCuisineInput.trim() && styles.addCuisineButtonDisabled,
+                    ]}
+                    disabled={!customCuisineInput.trim()}
+                  >
+                    <Text style={styles.addCuisineButtonText}>Add</Text>
+                  </Pressable>
+                </View>
+              </Animated.View>
+            )}
           </View>
         </View>
 
@@ -823,5 +963,54 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.6,
+  },
+  customCuisineWrapper: {
+    marginTop: 10,
+    width: '100%',
+  },
+  customCuisineInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === 'ios' ? 8 : 4,
+    gap: 8,
+  },
+  customCuisineInputContainerFocused: {
+    borderColor: BRAND_PRIMARY,
+    backgroundColor: '#FFFFFF',
+  },
+  customCuisineIcon: {
+    fontSize: 16,
+  },
+  customCuisineInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#0F172A',
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  addCuisineButton: {
+    backgroundColor: BRAND_PRIMARY,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addCuisineButtonPressed: {
+    opacity: 0.85,
+  },
+  addCuisineButtonDisabled: {
+    backgroundColor: '#CBD5E1',
+    opacity: 0.6,
+  },
+  addCuisineButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

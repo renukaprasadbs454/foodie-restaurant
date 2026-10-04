@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Text, Toast, useTheme } from 'foodie-shared-rn';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { generateSupportReply, getApiEndpoints, postToBackendSync } from '../supportAiEngine';
 
 import {

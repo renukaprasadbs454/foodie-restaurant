@@ -42,7 +42,7 @@ export type RestaurantAddress = {
 export type RegisterRestaurantRequest = {
   name: string;
   description?: string | null;
-  cuisineTypes: CuisineType[];
+  cuisineTypes: string[];
   restaurantType?: RestaurantCategoryType;
   address: RestaurantAddress;
 };
@@ -109,7 +109,9 @@ export function validateRegistrationForm(input: {
   if (description.length > 1000) {
     return { ok: false, message: 'Description must be at most 1000 characters.' };
   }
-  const cuisineTypes = input.cuisineTypes.filter(isCuisineType);
+  const cuisineTypes = input.cuisineTypes.filter(
+    (c) => typeof c === 'string' && c.trim().length > 0,
+  );
   if (cuisineTypes.length === 0) {
     return { ok: false, message: 'Select at least one cuisine type.' };
   }

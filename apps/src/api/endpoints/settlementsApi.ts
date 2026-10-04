@@ -9,7 +9,7 @@ export interface RestaurantSettlement {
     description?: string;
     createdAt: string;
     // Client-side computed properties for legacy UI support if needed
-    status?: 'COMPLETED' | 'REQUESTED' | 'PROCESSING' | 'FAILED';
+    status?: 'COMPLETED' | 'REQUESTED' | 'PROCESSING' | 'FAILED' | 'PENDING';
 }
 
 export interface PayoutRequestDto {

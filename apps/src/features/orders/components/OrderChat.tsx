@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, TextInput, ScrollView, Pressable, ActivityIndicator, Platform, KeyboardAvoidingView } from 'react-native';
 import { Text, useTheme } from 'foodie-shared-rn';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { useGetOrderMessagesQuery, useSendOrderMessageMutation } from '../../../api/endpoints/ordersApi';
 import { formatMoney } from '../types';
 

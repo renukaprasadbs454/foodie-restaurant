@@ -1,9 +1,12 @@
 import React, { useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import * as SplashScreen from 'expo-splash-screen';
 import { useConnectivity } from 'foodie-shared-rn';
 import { useAppDispatch } from '../../store/hooks';
 import { setConnectivity } from '../../store/connectivitySlice';
 import { runBootstrap } from './bootstrap';
+
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export function BootstrapGate({ children }: { children: ReactNode }) {
   const dispatch = useAppDispatch();
@@ -26,8 +29,14 @@ export function BootstrapGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
     void (async () => {
-      await runBootstrap(dispatch);
-      if (mounted) setReady(true);
+      try {
+        await runBootstrap(dispatch);
+      } finally {
+        if (mounted) {
+          setReady(true);
+          await SplashScreen.hideAsync().catch(() => {});
+        }
+      }
     })();
     return () => {
       mounted = false;
@@ -36,8 +45,8 @@ export function BootstrapGate({ children }: { children: ReactNode }) {
 
   if (!ready) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }}>
+        <ActivityIndicator size="large" color="#14532D" />
       </View>
     );
   }
