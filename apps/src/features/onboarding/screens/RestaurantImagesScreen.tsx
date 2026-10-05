@@ -232,42 +232,51 @@ export function RestaurantImagesScreen({ navigation }: Props) {
         </View>
 
         {/* Continue Action */}
-        <Pressable
-          style={({ pressed }) => [
-            styles.secondaryButton,
-            pressed && styles.secondaryButtonPressed,
-            (isSubmitting || !IMAGE_TYPES.every((t) => uploadedImages[t])) && styles.buttonDisabled,
-          ]}
-          onPress={async () => {
-            if (!IMAGE_TYPES.every((t) => uploadedImages[t])) {
-              setToast({ message: 'Please upload both Logo and Cover Banner before submitting.', variant: 'warning' });
-              return;
-            }
-            if (!isConnected) {
-              setToast({ message: 'Connect to the internet to submit.', variant: 'warning' });
-              return;
-            }
-            try {
-              await submitRegistration().unwrap();
-              trackAnalyticsEvent('restaurant_registration_submitted');
-              setToast({ message: 'Restaurant onboarding application submitted successfully!', variant: 'success' });
-              setTimeout(() => {
-                navigation.navigate('PendingApproval');
-              }, 800);
-            } catch (error) {
-              handleError(toUnwrappedApiError(error));
-            }
-          }}
-          disabled={isSubmitting || !IMAGE_TYPES.every((t) => uploadedImages[t])}
-        >
-          {isSubmitting ? (
-            <ActivityIndicator color={BRAND_PRIMARY} />
-          ) : (
-            <Text style={styles.secondaryButtonText}>
-              Submit & View Approval Status →
-            </Text>
-          )}
-        </Pressable>
+        <View style={{ gap: 12 }}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              pressed && styles.secondaryButtonPressed,
+              isSubmitting && styles.buttonDisabled,
+            ]}
+            onPress={async () => {
+              if (!IMAGE_TYPES.every((t) => uploadedImages[t])) {
+                setToast({ message: 'Please upload both Logo and Cover Banner before submitting.', variant: 'warning' });
+                return;
+              }
+              if (!isConnected) {
+                setToast({ message: 'Connect to the internet to submit.', variant: 'warning' });
+                return;
+              }
+              try {
+                await submitRegistration().unwrap();
+                trackAnalyticsEvent('restaurant_registration_submitted');
+                setToast({ message: 'Restaurant onboarding application submitted successfully!', variant: 'success' });
+                setTimeout(() => {
+                  navigation.navigate('PendingApproval');
+                }, 800);
+              } catch (error) {
+                handleError(toUnwrappedApiError(error));
+              }
+            }}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color={BRAND_PRIMARY} />
+            ) : (
+              <Text style={styles.secondaryButtonText}>
+                Submit & View Approval Status →
+              </Text>
+            )}
+          </Pressable>
+
+          <Pressable
+            onPress={() => navigation.navigate('RestaurantDocuments')}
+            style={{ alignItems: 'center', marginVertical: 8, paddingVertical: 8 }}
+          >
+            <Text style={{ color: '#64748B', fontSize: 14, fontWeight: '700' }}>← Back to Compliance Documents</Text>
+          </Pressable>
+        </View>
       </ScrollView>
 
       <Toast
