@@ -192,7 +192,7 @@ export function RestaurantImagesScreen({ navigation }: Props) {
                       selected && styles.imageTypeChipTextSelected,
                     ]}
                   >
-                    {uploadedImages[type] ? '✓ ' : ''}{type === 'LOGO' ? '🏷️ Brand Logo' : '🖼️ Cover Banner'}
+                    {uploadedImages[type] ? '✓ ' : ''}{type === 'LOGO' ? '🏷️ Brand Logo' : '🖼️ Cover Banner (Optional)'}
                   </Text>
                 </Pressable>
               );
@@ -251,8 +251,8 @@ export function RestaurantImagesScreen({ navigation }: Props) {
               isSubmitting && styles.buttonDisabled,
             ]}
             onPress={async () => {
-              if (!IMAGE_TYPES.every((t) => uploadedImages[t])) {
-                setToast({ message: 'Please upload both Logo and Cover Banner before submitting.', variant: 'warning' });
+              if (!uploadedImages['LOGO']) {
+                setToast({ message: 'Please upload a Brand Logo before submitting.', variant: 'warning' });
                 return;
               }
               if (!isConnected) {
