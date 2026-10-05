@@ -18,7 +18,7 @@ import {
   useApiErrorHandler,
   useConnectivity,
 } from 'foodie-shared-rn';
-import { useUploadRestaurantImagesMutation, useSubmitRegistrationMutation } from '../../../api/endpoints/restaurantsApi';
+import { useUploadRestaurantImagesMutation, useSubmitRegistrationMutation, useGetRestaurantProfileQuery } from '../../../api/endpoints/restaurantsApi';
 import { toUnwrappedApiError } from '../../auth/apiError';
 import { OnboardingStepper } from '../components/OnboardingStepper';
 import { IMAGE_TYPES, type RestaurantImageType } from '../types';
@@ -44,6 +44,17 @@ export function RestaurantImagesScreen({ navigation }: Props) {
     message: string;
     variant: 'info' | 'success' | 'error' | 'warning';
   } | null>(null);
+
+  const { data: profile } = useGetRestaurantProfileQuery();
+
+  useEffect(() => {
+    if (profile) {
+      const uploaded: Record<string, boolean> = {};
+      if (profile.logoImageUrl) uploaded['LOGO'] = true;
+      if (profile.coverImageUrl) uploaded['COVER'] = true;
+      setUploadedImages(prev => ({ ...prev, ...uploaded }));
+    }
+  }, [profile]);
 
   const handleError = useApiErrorHandler({
     onToast: (error) => setToast({ message: error.message, variant: 'error' }),

@@ -19,7 +19,7 @@ import {
   useConnectivity,
   TextInput,
 } from 'foodie-shared-rn';
-import { useUploadRestaurantDocumentMutation, useUpdateTimingsMutation } from '../../../api/endpoints/restaurantsApi';
+import { useUploadRestaurantDocumentMutation, useUpdateTimingsMutation, useGetRestaurantProfileQuery } from '../../../api/endpoints/restaurantsApi';
 import { toUnwrappedApiError } from '../../auth/apiError';
 import { OnboardingStepper } from '../components/OnboardingStepper';
 import { DOC_TYPES, type RestaurantDocType } from '../types';
@@ -114,6 +114,23 @@ export function RestaurantDocumentsScreen({ navigation }: Props) {
   const [openDays, setOpenDays] = useState<string[]>([]);
   const [openTime, setOpenTime] = useState('09:00:00');
   const [closeTime, setCloseTime] = useState('22:00:00');
+
+  const { data: profile } = useGetRestaurantProfileQuery();
+
+  useEffect(() => {
+    if (profile) {
+      if (profile.documents) {
+        const uploaded: Record<string, boolean> = {};
+        profile.documents.forEach((d: { docType: string }) => {
+          uploaded[d.docType] = true;
+        });
+        setUploadedTypes(prev => ({ ...prev, ...uploaded }));
+      }
+      if (profile.openTime) setOpenTime(profile.openTime);
+      if (profile.closeTime) setCloseTime(profile.closeTime);
+      if (profile.openDays) setOpenDays(profile.openDays);
+    }
+  }, [profile]);
 
   const allUploaded = DOC_TYPES.every((type) => uploadedTypes[type]);
   const timingsFilled = openDays.length > 0 && openTime.trim().length > 0 && closeTime.trim().length > 0;

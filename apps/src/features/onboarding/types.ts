@@ -61,6 +61,10 @@ export type RestaurantDetail = {
   avgRating?: number | string | null;
   commissionPct?: number | string | null;
   isOpen?: boolean;
+  openTime?: string | null;
+  closeTime?: string | null;
+  openDays?: string[] | null;
+  documents?: { docType: string }[] | null;
 };
 
 export type RestaurantDocumentUploadResult = {
