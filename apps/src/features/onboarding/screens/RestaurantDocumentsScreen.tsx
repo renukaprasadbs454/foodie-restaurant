@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +17,7 @@ import {
   trackAnalyticsEvent,
   useApiErrorHandler,
   useConnectivity,
+  TextInput,
 } from 'foodie-shared-rn';
 import { useUploadRestaurantDocumentMutation, useUpdateTimingsMutation } from '../../../api/endpoints/restaurantsApi';
 import { toUnwrappedApiError } from '../../auth/apiError';
@@ -30,6 +32,62 @@ type Props = NativeStackScreenProps<
 
 const BRAND_PRIMARY = '#14532D';
 const BRAND_ACCENT = '#F59E0B';
+
+const TIME_OPTIONS = Array.from({ length: 48 }).map((_, i) => {
+  const hours24 = Math.floor(i / 2);
+  const minutes = (i % 2) * 30;
+  const ampm = hours24 >= 12 ? 'PM' : 'AM';
+  const hours12 = hours24 % 12 || 12;
+  const label = `${hours12.toString().padStart(2, '0')}:${minutes === 0 ? '00' : '30'} ${ampm}`;
+  const value = `${hours24.toString().padStart(2, '0')}:${minutes === 0 ? '00' : '30'}:00`;
+  return { label, value };
+});
+
+const TimeSelect = ({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) => {
+  const [modalVisible, setModalVisible] = useState(false);
+  const selectedOption = TIME_OPTIONS.find(o => o.value === value) || TIME_OPTIONS[0];
+
+  return (
+    <View style={{ flex: 1 }}>
+      <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 4, fontWeight: '600' }}>{label}</Text>
+      <Pressable
+        style={styles.timeInputBox}
+        onPress={() => setModalVisible(true)}
+      >
+        <Text style={{ color: BRAND_PRIMARY, fontWeight: '700' }}>{selectedOption.label}</Text>
+      </Pressable>
+
+      <Modal visible={modalVisible} transparent animationType="slide">
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <View style={{ backgroundColor: 'white', borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '50%' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderColor: '#E2E8F0', alignItems: 'center' }}>
+              <Text style={{ fontSize: 16, fontWeight: '700' }}>Select Time</Text>
+              <Pressable onPress={() => setModalVisible(false)} style={{ padding: 4 }}>
+                <Text style={{ color: BRAND_PRIMARY, fontWeight: '700' }}>Done</Text>
+              </Pressable>
+            </View>
+            <ScrollView>
+              {TIME_OPTIONS.map(opt => (
+                <Pressable
+                  key={opt.value}
+                  style={{ padding: 16, borderBottomWidth: 1, borderColor: '#F1F5F9', backgroundColor: value === opt.value ? '#F0FDF4' : 'white' }}
+                  onPress={() => {
+                    onChange(opt.value);
+                    setModalVisible(false);
+                  }}
+                >
+                  <Text style={{ fontSize: 16, color: value === opt.value ? BRAND_PRIMARY : '#1E293B', fontWeight: value === opt.value ? '700' : '400', textAlign: 'center' }}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+};
 
 export function RestaurantDocumentsScreen({ navigation }: Props) {
   const { isConnected } = useConnectivity();
@@ -54,11 +112,11 @@ export function RestaurantDocumentsScreen({ navigation }: Props) {
   });
 
   const [openDays, setOpenDays] = useState<string[]>([]);
-  const [openTime, setOpenTime] = useState('09:00 AM');
-  const [closeTime, setCloseTime] = useState('10:00 PM');
+  const [openTime, setOpenTime] = useState('09:00:00');
+  const [closeTime, setCloseTime] = useState('22:00:00');
 
-  const allUploaded = DOC_TYPES.every(type => uploadedTypes[type]);
-  const timingsFilled = openDays.length > 0 && openTime && closeTime;
+  const allUploaded = DOC_TYPES.every((type) => uploadedTypes[type]);
+  const timingsFilled = openDays.length > 0 && openTime.trim().length > 0 && closeTime.trim().length > 0;
   const canProceed = allUploaded && timingsFilled;
 
   useEffect(() => {
@@ -194,18 +252,16 @@ export function RestaurantDocumentsScreen({ navigation }: Props) {
           <Text style={styles.sectionHeader}>⏰ Restaurant Delivery Timings</Text>
 
           <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 4, fontWeight: '600' }}>Open time</Text>
-              <View style={styles.timeInputBox}>
-                <Text style={{ color: BRAND_PRIMARY, fontWeight: '700' }}>{openTime}</Text>
-              </View>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 4, fontWeight: '600' }}>Close time</Text>
-              <View style={styles.timeInputBox}>
-                <Text style={{ color: BRAND_PRIMARY, fontWeight: '700' }}>{closeTime}</Text>
-              </View>
-            </View>
+            <TimeSelect
+              label="Open time"
+              value={openTime}
+              onChange={setOpenTime}
+            />
+            <TimeSelect
+              label="Close time"
+              value={closeTime}
+              onChange={setCloseTime}
+            />
           </View>
 
           <View style={{ marginTop: 16 }}>
@@ -240,7 +296,7 @@ export function RestaurantDocumentsScreen({ navigation }: Props) {
             style={({ pressed }) => [
               styles.secondaryButton,
               pressed && styles.secondaryButtonPressed,
-              (!canProceed || isUpdatingTimings) && styles.buttonDisabled,
+              isUpdatingTimings && styles.buttonDisabled,
             ]}
             onPress={async () => {
               if (canProceed) {
@@ -248,8 +304,8 @@ export function RestaurantDocumentsScreen({ navigation }: Props) {
                   setToast({ message: 'Connect to the internet to save timings.', variant: 'warning' });
                   return;
                 }
-                const isoOpenTime = openTime === '09:00 AM' ? '09:00:00' : '09:00:00';
-                const isoCloseTime = closeTime === '10:00 PM' ? '22:00:00' : '22:00:00';
+                const isoOpenTime = openTime;
+                const isoCloseTime = closeTime;
                 try {
                   await updateTimings({ openTime: isoOpenTime, closeTime: isoCloseTime, openDays }).unwrap();
                   trackAnalyticsEvent('restaurant_registration_timings_saved');
@@ -258,13 +314,20 @@ export function RestaurantDocumentsScreen({ navigation }: Props) {
                   handleError(toUnwrappedApiError(error));
                 }
               } else {
-                setToast({
-                  message: !allUploaded ? 'Please upload all compliance documents before proceeding.' : 'Please select your delivery timings and open days.',
-                  variant: 'warning',
-                });
+                if (!allUploaded) {
+                  setToast({
+                    message: 'Please upload all compliance documents before proceeding.',
+                    variant: 'warning',
+                  });
+                } else {
+                  setToast({
+                    message: 'Please provide open time, close time, and select at least one open day. They are mandatory.',
+                    variant: 'warning',
+                  });
+                }
               }
             }}
-            disabled={!canProceed || isUpdatingTimings}
+            disabled={isUpdatingTimings}
           >
             {isUpdatingTimings ? (
               <ActivityIndicator color={BRAND_PRIMARY} />

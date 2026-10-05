@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Image,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -55,6 +56,70 @@ type Props = NativeStackScreenProps<ProfileStackParamList, 'RestaurantProfile'>;
 const BRAND_PRIMARY = '#14532D'; // Dark Green
 const BRAND_ACCENT = '#F59E0B';  // Gold
 const COVER_IMAGE_URL = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&auto=format&fit=crop&q=80';
+
+const TIME_OPTIONS = Array.from({ length: 48 }).map((_, i) => {
+  const hours24 = Math.floor(i / 2);
+  const minutes = (i % 2) * 30;
+  const ampm = hours24 >= 12 ? 'PM' : 'AM';
+  const hours12 = hours24 % 12 || 12;
+  const label = `${hours12.toString().padStart(2, '0')}:${minutes === 0 ? '00' : '30'} ${ampm}`;
+  const value = `${hours24.toString().padStart(2, '0')}:${minutes === 0 ? '00' : '30'}:00`;
+  return { label, value };
+});
+
+const TimeSelect = ({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) => {
+  const [modalVisible, setModalVisible] = useState(false);
+  const selectedOption = TIME_OPTIONS.find(o => o.value === value) || TIME_OPTIONS[0];
+
+  return (
+    <View style={{ flex: 1 }}>
+      <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 4, fontWeight: '600' }}>{label}</Text>
+      <Pressable
+        style={{
+          borderWidth: 1.5,
+          borderColor: '#E2E8F0',
+          borderRadius: 8,
+          paddingVertical: 12,
+          paddingHorizontal: 16,
+          alignItems: 'flex-start',
+          backgroundColor: '#FFFFFF'
+        }}
+        onPress={() => setModalVisible(true)}
+      >
+        <Text style={{ color: '#1E293B', fontSize: 15 }}>{selectedOption.label}</Text>
+      </Pressable>
+
+      <Modal visible={modalVisible} transparent animationType="slide">
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <View style={{ backgroundColor: 'white', borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '50%' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderColor: '#E2E8F0', alignItems: 'center' }}>
+              <Text style={{ fontSize: 16, fontWeight: '700' }}>Select Time</Text>
+              <Pressable onPress={() => setModalVisible(false)} style={{ padding: 4 }}>
+                <Text style={{ color: BRAND_PRIMARY, fontWeight: '700' }}>Done</Text>
+              </Pressable>
+            </View>
+            <ScrollView>
+              {TIME_OPTIONS.map(opt => (
+                <Pressable
+                  key={opt.value}
+                  style={{ padding: 16, borderBottomWidth: 1, borderColor: '#F1F5F9', backgroundColor: value === opt.value ? '#F0FDF4' : 'white' }}
+                  onPress={() => {
+                    onChange(opt.value);
+                    setModalVisible(false);
+                  }}
+                >
+                  <Text style={{ fontSize: 16, color: value === opt.value ? BRAND_PRIMARY : '#1E293B', fontWeight: value === opt.value ? '700' : '400', textAlign: 'center' }}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+};
 
 export function RestaurantProfileScreen({ navigation }: Props) {
   const { tokens } = useTheme();
@@ -499,22 +564,16 @@ export function RestaurantProfileScreen({ navigation }: Props) {
 
               {/* Operating Hours */}
               <View style={{ flexDirection: 'row', gap: tokens.spacing.sm }}>
-                <View style={{ flex: 1 }}>
-                  <TextInput
-                    label="Opening Time (e.g. 09:00:00)"
-                    value={openingTime}
-                    onChangeText={setOpeningTime}
-                    accessibilityLabel="Opening Time"
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <TextInput
-                    label="Closing Time (e.g. 22:00:00)"
-                    value={closingTime}
-                    onChangeText={setClosingTime}
-                    accessibilityLabel="Closing Time"
-                  />
-                </View>
+                <TimeSelect
+                  label="Opening Time"
+                  value={openingTime}
+                  onChange={setOpeningTime}
+                />
+                <TimeSelect
+                  label="Closing Time"
+                  value={closingTime}
+                  onChange={setClosingTime}
+                />
               </View>
 
               {/* Operating Days */}
