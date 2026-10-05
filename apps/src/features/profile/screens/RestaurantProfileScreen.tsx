@@ -311,7 +311,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      quality: 1,
+      quality: 0.5,
       allowsEditing: false,
     });
     if (result.canceled || !result.assets?.[0]) return;
@@ -347,7 +347,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      quality: 1,
+      quality: 0.5,
       allowsEditing: false,
     });
     if (result.canceled || !result.assets?.[0]) return;
