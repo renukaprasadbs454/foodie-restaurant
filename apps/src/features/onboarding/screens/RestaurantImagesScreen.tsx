@@ -18,7 +18,7 @@ import {
   useApiErrorHandler,
   useConnectivity,
 } from 'foodie-shared-rn';
-import { useUploadRestaurantImagesMutation } from '../../../api/endpoints/restaurantsApi';
+import { useUploadRestaurantImagesMutation, useSubmitRegistrationMutation } from '../../../api/endpoints/restaurantsApi';
 import { toUnwrappedApiError } from '../../auth/apiError';
 import { OnboardingStepper } from '../components/OnboardingStepper';
 import { IMAGE_TYPES, type RestaurantImageType } from '../types';
@@ -35,8 +35,10 @@ const BRAND_ACCENT = '#F59E0B';
 export function RestaurantImagesScreen({ navigation }: Props) {
   const { isConnected } = useConnectivity();
   const [upload, uploadState] = useUploadRestaurantImagesMutation();
+  const [submitRegistration, { isLoading: isSubmitting }] = useSubmitRegistrationMutation();
   const [imageType, setImageType] = useState<RestaurantImageType>('LOGO');
   const [previewUri, setPreviewUri] = useState<string | null>(null);
+  const [uploadedImages, setUploadedImages] = useState<Record<string, boolean>>({});
   const [pendingAsset, setPendingAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [toast, setToast] = useState<{
     message: string;
@@ -122,6 +124,7 @@ export function RestaurantImagesScreen({ navigation }: Props) {
       }).unwrap();
       trackAnalyticsEvent('image_uploaded', { imageType });
       trackAnalyticsEvent('restaurant_image_uploaded', { imageType });
+      setUploadedImages((prev) => ({ ...prev, [imageType]: true }));
       setToast({ message: `${imageType} uploaded successfully!`, variant: 'success' });
       setPendingAsset(null);
     } catch (error) {
@@ -178,7 +181,7 @@ export function RestaurantImagesScreen({ navigation }: Props) {
                       selected && styles.imageTypeChipTextSelected,
                     ]}
                   >
-                    {type === 'LOGO' ? '🏷️ Brand Logo' : '🖼️ Cover Banner'}
+                    {uploadedImages[type] ? '✓ ' : ''}{type === 'LOGO' ? '🏷️ Brand Logo' : '🖼️ Cover Banner'}
                   </Text>
                 </Pressable>
               );
@@ -233,17 +236,37 @@ export function RestaurantImagesScreen({ navigation }: Props) {
           style={({ pressed }) => [
             styles.secondaryButton,
             pressed && styles.secondaryButtonPressed,
+            (isSubmitting || !IMAGE_TYPES.every((t) => uploadedImages[t])) && styles.buttonDisabled,
           ]}
-          onPress={() => {
-            setToast({ message: 'Restaurant onboarding application submitted successfully!', variant: 'success' });
-            setTimeout(() => {
-              navigation.navigate('PendingApproval');
-            }, 800);
+          onPress={async () => {
+            if (!IMAGE_TYPES.every((t) => uploadedImages[t])) {
+              setToast({ message: 'Please upload both Logo and Cover Banner before submitting.', variant: 'warning' });
+              return;
+            }
+            if (!isConnected) {
+              setToast({ message: 'Connect to the internet to submit.', variant: 'warning' });
+              return;
+            }
+            try {
+              await submitRegistration().unwrap();
+              trackAnalyticsEvent('restaurant_registration_submitted');
+              setToast({ message: 'Restaurant onboarding application submitted successfully!', variant: 'success' });
+              setTimeout(() => {
+                navigation.navigate('PendingApproval');
+              }, 800);
+            } catch (error) {
+              handleError(toUnwrappedApiError(error));
+            }
           }}
+          disabled={isSubmitting || !IMAGE_TYPES.every((t) => uploadedImages[t])}
         >
-          <Text style={styles.secondaryButtonText}>
-            Submit & View Approval Status →
-          </Text>
+          {isSubmitting ? (
+            <ActivityIndicator color={BRAND_PRIMARY} />
+          ) : (
+            <Text style={styles.secondaryButtonText}>
+              Submit & View Approval Status →
+            </Text>
+          )}
         </Pressable>
       </ScrollView>
 

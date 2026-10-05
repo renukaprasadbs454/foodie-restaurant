@@ -17,7 +17,7 @@ import {
   useApiErrorHandler,
   useConnectivity,
 } from 'foodie-shared-rn';
-import { useUploadRestaurantDocumentMutation } from '../../../api/endpoints/restaurantsApi';
+import { useUploadRestaurantDocumentMutation, useUpdateTimingsMutation } from '../../../api/endpoints/restaurantsApi';
 import { toUnwrappedApiError } from '../../auth/apiError';
 import { OnboardingStepper } from '../components/OnboardingStepper';
 import { DOC_TYPES, type RestaurantDocType } from '../types';
@@ -34,6 +34,7 @@ const BRAND_ACCENT = '#F59E0B';
 export function RestaurantDocumentsScreen({ navigation }: Props) {
   const { isConnected } = useConnectivity();
   const [upload, uploadState] = useUploadRestaurantDocumentMutation();
+  const [updateTimings, { isLoading: isUpdatingTimings }] = useUpdateTimingsMutation();
   const [docType, setDocType] = useState<RestaurantDocType>('FSSAI');
   const [uploadedTypes, setUploadedTypes] = useState<Record<string, boolean>>({});
   const [toast, setToast] = useState<{
@@ -52,13 +53,20 @@ export function RestaurantDocumentsScreen({ navigation }: Props) {
     onGeneric: (error) => setToast({ message: error.message, variant: 'error' }),
   });
 
+  const [openDays, setOpenDays] = useState<string[]>([]);
+  const [openTime, setOpenTime] = useState('09:00 AM');
+  const [closeTime, setCloseTime] = useState('10:00 PM');
+
   const allUploaded = DOC_TYPES.every(type => uploadedTypes[type]);
+  const timingsFilled = openDays.length > 0 && openTime && closeTime;
+  const canProceed = allUploaded && timingsFilled;
 
   useEffect(() => {
     trackAnalyticsEvent('restaurant_documents_viewed');
   }, []);
 
   const onPickAndUpload = async (selectedDocType: RestaurantDocType) => {
+    // ... [existing function logic untouched, we keep it as is, but we must provide the whole function body since we replace it]
     setDocType(selectedDocType);
     if (!isConnected) {
       setToast({
@@ -107,6 +115,14 @@ export function RestaurantDocumentsScreen({ navigation }: Props) {
       handleError(toUnwrappedApiError(error));
     }
   };
+
+  const toggleDay = (day: string) => {
+    setOpenDays(prev =>
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+    );
+  };
+
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
   return (
     <View style={styles.screen}>
@@ -173,28 +189,97 @@ export function RestaurantDocumentsScreen({ navigation }: Props) {
           </View>
         </View>
 
+        {/* Timing Selection Card */}
+        <View style={styles.card}>
+          <Text style={styles.sectionHeader}>⏰ Restaurant Delivery Timings</Text>
+
+          <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 4, fontWeight: '600' }}>Open time</Text>
+              <View style={styles.timeInputBox}>
+                <Text style={{ color: BRAND_PRIMARY, fontWeight: '700' }}>{openTime}</Text>
+              </View>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 4, fontWeight: '600' }}>Close time</Text>
+              <View style={styles.timeInputBox}>
+                <Text style={{ color: BRAND_PRIMARY, fontWeight: '700' }}>{closeTime}</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={{ marginTop: 16 }}>
+            <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 4, fontWeight: '600' }}>Mark open days</Text>
+            <Text style={{ fontSize: 11, color: '#94A3B8', marginBottom: 12 }}>Don't forget to uncheck your off-day</Text>
+
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {DAYS.map(day => {
+                const isSelected = openDays.includes(day);
+                return (
+                  <Pressable
+                    key={day}
+                    onPress={() => toggleDay(day)}
+                    style={[
+                      styles.dayChip,
+                      isSelected && styles.dayChipSelected
+                    ]}
+                  >
+                    <Text style={[styles.dayChipText, isSelected && styles.dayChipTextSelected]}>
+                      {isSelected ? '☑' : '☐'} {day}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+
         {/* Navigation Action Buttons */}
         <View style={{ gap: 12 }}>
           <Pressable
             style={({ pressed }) => [
               styles.secondaryButton,
               pressed && styles.secondaryButtonPressed,
-              !allUploaded && styles.buttonDisabled,
+              (!canProceed || isUpdatingTimings) && styles.buttonDisabled,
             ]}
-            onPress={() => {
-              if (allUploaded) {
-                navigation.navigate('RestaurantImages');
+            onPress={async () => {
+              if (canProceed) {
+                if (!isConnected) {
+                  setToast({ message: 'Connect to the internet to save timings.', variant: 'warning' });
+                  return;
+                }
+                const isoOpenTime = openTime === '09:00 AM' ? '09:00:00' : '09:00:00';
+                const isoCloseTime = closeTime === '10:00 PM' ? '22:00:00' : '22:00:00';
+                try {
+                  await updateTimings({ openTime: isoOpenTime, closeTime: isoCloseTime, openDays }).unwrap();
+                  trackAnalyticsEvent('restaurant_registration_timings_saved');
+                  navigation.navigate('RestaurantImages');
+                } catch (error) {
+                  handleError(toUnwrappedApiError(error));
+                }
               } else {
                 setToast({
-                  message: 'Please upload all compliance documents before proceeding.',
+                  message: !allUploaded ? 'Please upload all compliance documents before proceeding.' : 'Please select your delivery timings and open days.',
                   variant: 'warning',
                 });
               }
             }}
+            disabled={!canProceed || isUpdatingTimings}
           >
-            <Text style={styles.secondaryButtonText}>
-              Proceed to Images →
-            </Text>
+            {isUpdatingTimings ? (
+              <ActivityIndicator color={BRAND_PRIMARY} />
+            ) : (
+              <Text style={styles.secondaryButtonText}>
+                Proceed to Images →
+              </Text>
+            )}
+          </Pressable>
+
+          <Pressable
+            onPress={() => navigation.navigate('RestaurantRegistration')}
+            style={{ alignItems: 'center', marginVertical: 8, paddingVertical: 8 }}
+          >
+            <Text style={{ color: '#64748B', fontSize: 14, fontWeight: '700' }}>← Back to Basic Info</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -376,5 +461,37 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.6,
+  },
+  timeInputBox: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  dayChip: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  dayChipSelected: {
+    backgroundColor: '#F0FDF4',
+    borderColor: BRAND_PRIMARY,
+  },
+  dayChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  dayChipTextSelected: {
+    color: BRAND_PRIMARY,
+    fontWeight: '900',
   },
 });

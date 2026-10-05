@@ -28,6 +28,7 @@ import {
   useGetRestaurantQuery,
   useUpdateRestaurantProfileMutation,
   useUploadRestaurantImagesMutation,
+  useUpdateTimingsMutation,
 } from '../../../api/endpoints/restaurantsApi';
 import { useAppDispatch, useAppSelector } from '../../../store/hooks';
 import {
@@ -96,6 +97,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [openingTime, setOpeningTime] = useState('');
   const [closingTime, setClosingTime] = useState('');
+  const [openDays, setOpenDays] = useState<string[]>([]);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [coverUri, setCoverUri] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -112,6 +114,9 @@ export function RestaurantProfileScreen({ navigation }: Props) {
 
   const [updateProfile, updateState] = useUpdateRestaurantProfileMutation();
   const [uploadImage] = useUploadRestaurantImagesMutation();
+  const [updateTimings, updateTimingsState] = useUpdateTimingsMutation();
+
+  const DAYS_OF_WEEK = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
   const apiProfile = query.data;
   const isUsingMock =
@@ -145,8 +150,13 @@ export function RestaurantProfileScreen({ navigation }: Props) {
 
     setDescription(desc.replace(/\[(?:PHONE|OPEN|CLOSE):.*?\]/g, '').trim());
     setPhone(phoneMatch ? phoneMatch[1] : (profileData as MockRestaurantProfile).phone ?? '+91 98765 43210');
-    setOpeningTime(openMatch ? openMatch[1] : (profileData as MockRestaurantProfile).openingTime ?? '11:00 AM');
-    setClosingTime(closeMatch ? closeMatch[1] : (profileData as MockRestaurantProfile).closingTime ?? '11:00 PM');
+
+    // Parse times or use old hack as fallback
+    let openT = (profileData as any).openTime || (openMatch ? openMatch[1] : '09:00:00');
+    let closeT = (profileData as any).closeTime || (closeMatch ? closeMatch[1] : '22:00:00');
+    setOpeningTime(openT);
+    setClosingTime(closeT);
+    setOpenDays((profileData as any).openDays || ['MON', 'TUE', 'WED', 'THU', 'FRI']);
 
     setCuisineTypes(
       (profileData.cuisineTypes ?? []).filter((c): c is CuisineType =>
@@ -180,6 +190,14 @@ export function RestaurantProfileScreen({ navigation }: Props) {
     );
   };
 
+  const toggleDay = (day: string) => {
+    setOpenDays((prev) =>
+      prev.includes(day)
+        ? prev.filter((d) => d !== day)
+        : [...prev, day],
+    );
+  };
+
   const onSave = async () => {
     const validated = validateProfileForm({
       name,
@@ -202,11 +220,17 @@ export function RestaurantProfileScreen({ navigation }: Props) {
       return;
     }
 
-    validated.value.description = `${validated.value.description || ''} [PHONE:${phone}] [OPEN:${openingTime}] [CLOSE:${closingTime}]`.trim();
+    validated.value.description = `${validated.value.description || ''} [PHONE:${phone}]`.trim();
 
     try {
       await updateProfile(validated.value).unwrap();
-      setToast({ message: 'Profile saved successfully.', variant: 'success' });
+      await updateTimings({
+        openTime: openingTime, // assumes 'HH:mm:ss' or 'HH:mm' format
+        closeTime: closingTime,
+        openDays,
+      }).unwrap();
+
+      setToast({ message: 'Profile and timings saved successfully.', variant: 'success' });
       setHydrated(false);
       void query.refetch();
     } catch (error) {
@@ -477,7 +501,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
               <View style={{ flexDirection: 'row', gap: tokens.spacing.sm }}>
                 <View style={{ flex: 1 }}>
                   <TextInput
-                    label="Opening Time"
+                    label="Opening Time (e.g. 09:00:00)"
                     value={openingTime}
                     onChangeText={setOpeningTime}
                     accessibilityLabel="Opening Time"
@@ -485,11 +509,49 @@ export function RestaurantProfileScreen({ navigation }: Props) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <TextInput
-                    label="Closing Time"
+                    label="Closing Time (e.g. 22:00:00)"
                     value={closingTime}
                     onChangeText={setClosingTime}
                     accessibilityLabel="Closing Time"
                   />
+                </View>
+              </View>
+
+              {/* Operating Days */}
+              <View style={{ gap: tokens.spacing.xs, marginTop: 4 }}>
+                <Text variant="label">Operating Days</Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    flexWrap: 'wrap',
+                    gap: tokens.spacing.xs,
+                  }}
+                >
+                  {DAYS_OF_WEEK.map((day) => {
+                    const selected = openDays.includes(day);
+                    return (
+                      <Pressable
+                        key={day}
+                        onPress={() => toggleDay(day)}
+                        style={{
+                          paddingHorizontal: tokens.spacing.sm,
+                          paddingVertical: tokens.spacing.xs,
+                          borderRadius: tokens.radius.full,
+                          borderWidth: 1,
+                          borderColor: selected ? BRAND_PRIMARY : tokens.color.border,
+                          backgroundColor: selected ? BRAND_PRIMARY : tokens.color.surface,
+                        }}
+                      >
+                        <Text
+                          variant="caption"
+                          color={selected ? '#FFFFFF' : tokens.color.textPrimary}
+                          style={{ fontWeight: selected ? 'bold' : 'normal' }}
+                        >
+                          {day}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               </View>
 
@@ -662,7 +724,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
             <Button
               label="Save Restaurant Profile"
               accessibilityLabel="Save profile"
-              loading={updateState.isLoading}
+              loading={updateState.isLoading || updateTimingsState.isLoading}
               style={{ backgroundColor: BRAND_PRIMARY, height: 48 }}
               onPress={() => {
                 void onSave();

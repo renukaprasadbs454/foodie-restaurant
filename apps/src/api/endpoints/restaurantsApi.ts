@@ -202,6 +202,35 @@ export const restaurantsApi = baseApi.injectEndpoints({
           ]
           : [{ type: 'Restaurant', id: 'LIST' }],
     }),
+    updateTimings: builder.mutation<RestaurantDetail, { openTime: string; closeTime: string; openDays: string[] }>({
+      query: (body) => ({
+        url: '/api/v1/restaurants/me/timings',
+        method: 'PUT',
+        body,
+      }),
+      transformResponse: (response: any) => response?.data || response,
+      invalidatesTags: (result) =>
+        result?.restaurantId
+          ? [
+            { type: 'Restaurant', id: result.restaurantId },
+            { type: 'Restaurant', id: 'LIST' },
+          ]
+          : [{ type: 'Restaurant', id: 'LIST' }],
+    }),
+    submitRegistration: builder.mutation<RestaurantDetail, void>({
+      query: () => ({
+        url: '/api/v1/restaurants/me/submit',
+        method: 'POST',
+      }),
+      transformResponse: (response: any) => response?.data || response,
+      invalidatesTags: (result) =>
+        result?.restaurantId
+          ? [
+            { type: 'Restaurant', id: result.restaurantId },
+            { type: 'Restaurant', id: 'LIST' },
+          ]
+          : [{ type: 'Restaurant', id: 'LIST' }],
+    }),
     getDashboardSummary: builder.query<any, { dateFrom?: string; dateTo?: string } | void>({
       query: (params) => ({
         url: '/api/v1/restaurants/me/dashboard-summary',
@@ -223,5 +252,7 @@ export const {
   useUploadRestaurantDocumentMutation,
   useUploadRestaurantImagesMutation,
   useResubmitRestaurantMutation,
+  useUpdateTimingsMutation,
+  useSubmitRegistrationMutation,
   useGetDashboardSummaryQuery,
 } = restaurantsApi;
