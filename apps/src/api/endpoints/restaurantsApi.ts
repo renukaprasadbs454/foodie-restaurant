@@ -59,7 +59,10 @@ export const restaurantsApi = baseApi.injectEndpoints({
       transformResponse: (response: any) => response?.data || response,
       providesTags: (result) =>
         result?.restaurantId
-          ? [{ type: 'Restaurant', id: result.restaurantId }]
+          ? [
+            { type: 'Restaurant', id: result.restaurantId },
+            { type: 'Restaurant', id: 'LIST' },
+          ]
           : [{ type: 'Restaurant', id: 'LIST' }],
       keepUnusedDataFor: 120,
     }),

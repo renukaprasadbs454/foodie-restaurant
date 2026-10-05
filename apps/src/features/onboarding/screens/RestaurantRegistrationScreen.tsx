@@ -20,7 +20,7 @@ import {
   useApiErrorHandler,
   useConnectivity,
 } from 'foodie-shared-rn';
-import { useRegisterRestaurantMutation, restaurantsApi } from '../../../api/endpoints/restaurantsApi';
+import { useRegisterRestaurantMutation, useGetRestaurantProfileQuery, restaurantsApi } from '../../../api/endpoints/restaurantsApi';
 import { useAppDispatch } from '../../../store/hooks';
 import { clearIsNewUser } from '../../auth/authSlice';
 import { toUnwrappedApiError } from '../../auth/apiError';
@@ -130,6 +130,34 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
   const [fetchingLocation, setFetchingLocation] = useState(false);
   const mapRef = useRef<any>(null);
 
+  const { data: profile } = useGetRestaurantProfileQuery(undefined, { skip: !isConnected });
+
+  useEffect(() => {
+    if (profile) {
+      if (profile.name) setName(profile.name);
+      if (profile.description) setDescription(profile.description);
+      if (profile.restaurantType) setRestaurantType(profile.restaurantType as any);
+      if (profile.cuisineTypes) setCuisineTypes(profile.cuisineTypes);
+
+      if (profile.address) {
+        setLine1(profile.address.line1);
+        if (profile.address.line2) setLine2(profile.address.line2);
+        setCity(profile.address.city);
+        setPincode(profile.address.pincode);
+        setLatitude(String(profile.address.latitude));
+        setLongitude(String(profile.address.longitude));
+
+        const newRegion = {
+          latitude: Number(profile.address.latitude),
+          longitude: Number(profile.address.longitude),
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
+        };
+        setMapRegion(newRegion);
+      }
+    }
+  }, [profile]);
+
   const fetchExactLocation = async () => {
     setFetchingLocation(true);
     try {
@@ -202,7 +230,9 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
 
   useEffect(() => {
     trackAnalyticsEvent('restaurant_registration_viewed');
-    void fetchExactLocation();
+    if (!profile) {
+      void fetchExactLocation();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
