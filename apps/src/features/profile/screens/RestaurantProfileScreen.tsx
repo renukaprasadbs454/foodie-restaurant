@@ -57,6 +57,37 @@ const BRAND_PRIMARY = '#14532D'; // Dark Green
 const BRAND_ACCENT = '#F59E0B';  // Gold
 const COVER_IMAGE_URL = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&auto=format&fit=crop&q=80';
 
+
+function formatTo24HourTime(timeStr?: string | null): string {
+  if (!timeStr || !timeStr.trim()) return '09:00:00';
+  const trimmed = timeStr.trim();
+  
+  const match24 = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (match24) {
+    const h = match24[1].padStart(2, '0');
+    const m = match24[2];
+    const s = match24[3] || '00';
+    return `${h}:${m}:${s}`;
+  }
+
+  const match12 = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)$/i);
+  if (match12) {
+    let hours = parseInt(match12[1], 10);
+    const minutes = match12[2];
+    const seconds = match12[3] || '00';
+    const ampm = match12[4].toUpperCase();
+
+    if (ampm === 'PM' && hours < 12) {
+      hours += 12;
+    } else if (ampm === 'AM' && hours === 12) {
+      hours = 0;
+    }
+    return `${hours.toString().padStart(2, '0')}:${minutes}:${seconds}`;
+  }
+
+  return trimmed;
+}
+
 const TIME_OPTIONS = Array.from({ length: 48 }).map((_, i) => {
   const hours24 = Math.floor(i / 2);
   const minutes = (i % 2) * 30;
@@ -69,7 +100,7 @@ const TIME_OPTIONS = Array.from({ length: 48 }).map((_, i) => {
 
 const TimeSelect = ({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) => {
   const [modalVisible, setModalVisible] = useState(false);
-  const selectedOption = TIME_OPTIONS.find(o => o.value === value) || TIME_OPTIONS[0];
+  const selectedOption = TIME_OPTIONS.find(o => o.value === value || o.label === value || o.value === formatTo24HourTime(value)) || TIME_OPTIONS[0];
 
   return (
     <View style={{ flex: 1 }}>
@@ -290,12 +321,12 @@ export function RestaurantProfileScreen({ navigation }: Props) {
     try {
       await updateProfile(validated.value).unwrap();
       await updateTimings({
-        openTime: openingTime, // assumes 'HH:mm:ss' or 'HH:mm' format
-        closeTime: closingTime,
+        openTime: formatTo24HourTime(openingTime),
+        closeTime: formatTo24HourTime(closingTime),
         openDays,
       }).unwrap();
 
-      setToast({ message: 'Profile and timings saved successfully.', variant: 'success' });
+      setToast({ message: 'Profile saved successfully.', variant: 'success' });
       setHydrated(false);
       void query.refetch();
     } catch (error) {

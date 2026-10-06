@@ -17,8 +17,10 @@ export function ReviewDetailsModal({ review, visible, onClose }: Props) {
 
   if (!review) return null;
 
-  const rating = Number(review.restaurantRating) || 5;
+  const rating = Number(review.restaurantRating ?? review.rating) || 5;
   const starsString = '★'.repeat(Math.min(5, Math.max(1, Math.round(rating))));
+  const customerDisplayName = review.customerName ?? 'Verified Customer';
+  const dateStr = review.createdAt || review.date;
 
   return (
     <Modal
@@ -41,11 +43,16 @@ export function ReviewDetailsModal({ review, visible, onClose }: Props) {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <View style={{ gap: 2 }}>
               <Text variant="heading2" style={{ color: BRAND_PRIMARY, fontSize: 18 }}>
-                Verified Customer
+                {customerDisplayName}
               </Text>
               <Text variant="caption" color={tokens.color.textSecondary}>
-                📅 {review.createdAt ? new Date(review.createdAt).toLocaleString() : 'Recent Rating'}
+                📅 {dateStr ? new Date(dateStr).toLocaleString() : 'Recent Rating'}
               </Text>
+              {review.orderId ? (
+                <Text variant="caption" color={tokens.color.textSecondary}>
+                  Order #{String(review.orderId).slice(0, 8)}
+                </Text>
+              ) : null}
             </View>
 
             <View style={{ alignItems: 'flex-end', gap: 2 }}>

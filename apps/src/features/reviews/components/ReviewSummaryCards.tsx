@@ -18,24 +18,27 @@ export function ReviewSummaryCards({ reviews }: Props) {
   const totalCount = reviews.length;
 
   const avgRatingNum = useMemo(() => {
-    if (!totalCount) return 5.0;
-    const sum = reviews.reduce((acc, r) => acc + (Number(r.restaurantRating) || 0), 0);
+    if (!totalCount) return 0.0;
+    const sum = reviews.reduce((acc, r) => acc + (Number(r.restaurantRating ?? r.rating) || 0), 0);
     return sum / totalCount;
   }, [reviews, totalCount]);
 
-  const avgRating = avgRatingNum.toFixed(1);
+  const avgRating = totalCount > 0 ? avgRatingNum.toFixed(1) : '0.0';
 
   const positiveCount = useMemo(
-    () => reviews.filter((r) => r.restaurantRating >= 4).length,
+    () => reviews.filter((r) => (Number(r.restaurantRating ?? r.rating) || 0) >= 4).length,
     [reviews],
   );
 
   const positivePct = totalCount
     ? Math.round((positiveCount / totalCount) * 100)
-    : 100;
+    : 0;
 
   const needsImpCount = useMemo(
-    () => reviews.filter((r) => r.restaurantRating < 4).length,
+    () => reviews.filter((r) => {
+      const rate = Number(r.restaurantRating ?? r.rating) || 0;
+      return rate > 0 && rate <= 3;
+    }).length,
     [reviews],
   );
 
@@ -76,7 +79,9 @@ export function ReviewSummaryCards({ reviews }: Props) {
           </Text>
         </View>
         <Text variant="caption" style={{ color: '#B45309' }}>
-          Based on {totalCount} verified reviews
+          {totalCount > 0
+            ? `Based on ${totalCount} verified ${totalCount === 1 ? 'review' : 'reviews'}`
+            : 'Based on 0 verified reviews'}
         </Text>
       </Card>
 

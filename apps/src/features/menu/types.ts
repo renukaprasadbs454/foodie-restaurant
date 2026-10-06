@@ -25,6 +25,11 @@ export type MenuItem = {
   categoryId?: string;
   categoryName?: string;
   rating?: number;
+  avg_rating?: number | null;
+  avgRating?: number | null;
+  average_rating?: number | null;
+  review_count?: number | null;
+  reviewCount?: number | null;
   preparationTime?: string;
   createdAt?: number;
   packageSize?: string | null;
@@ -43,6 +48,11 @@ export type NormalizedMenuItem = {
   isVeg: boolean;
   isAvailable: boolean;
   rating: number;
+  avg_rating: number;
+  avgRating: number;
+  average_rating: number;
+  review_count: number;
+  reviewCount: number;
   preparationTime: string;
   variants: MenuVariant[];
   createdAt: number;
@@ -83,7 +93,12 @@ export function normalizeMenuItem(
     foodType,
     isVeg,
     isAvailable: typeof raw.isAvailable === 'boolean' ? raw.isAvailable : true,
-    rating: typeof raw.rating === 'number' && Number.isFinite(raw.rating) ? raw.rating : 4.5,
+    rating: Number.isFinite(raw.avg_rating) ? Number(raw.avg_rating) : (Number.isFinite(raw.avgRating) ? Number(raw.avgRating) : (Number.isFinite(raw.average_rating) ? Number(raw.average_rating) : (typeof raw.rating === 'number' && Number.isFinite(raw.rating) ? raw.rating : 0))),
+    avg_rating: Number.isFinite(raw.avg_rating) ? Number(raw.avg_rating) : (Number.isFinite(raw.avgRating) ? Number(raw.avgRating) : (Number.isFinite(raw.average_rating) ? Number(raw.average_rating) : (typeof raw.rating === 'number' && Number.isFinite(raw.rating) ? raw.rating : 0))),
+    avgRating: Number.isFinite(raw.avg_rating) ? Number(raw.avg_rating) : (Number.isFinite(raw.avgRating) ? Number(raw.avgRating) : (Number.isFinite(raw.average_rating) ? Number(raw.average_rating) : (typeof raw.rating === 'number' && Number.isFinite(raw.rating) ? raw.rating : 0))),
+    average_rating: Number.isFinite(raw.avg_rating) ? Number(raw.avg_rating) : (Number.isFinite(raw.avgRating) ? Number(raw.avgRating) : (Number.isFinite(raw.average_rating) ? Number(raw.average_rating) : (typeof raw.rating === 'number' && Number.isFinite(raw.rating) ? raw.rating : 0))),
+    review_count: Number.isFinite(raw.review_count) ? Number(raw.review_count) : (Number.isFinite(raw.reviewCount) ? Number(raw.reviewCount) : 0),
+    reviewCount: Number.isFinite(raw.review_count) ? Number(raw.review_count) : (Number.isFinite(raw.reviewCount) ? Number(raw.reviewCount) : 0),
     preparationTime: raw.preparationTime || '15 min',
     variants: Array.isArray(raw.variants) ? raw.variants : [],
     createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : Date.now(),
@@ -186,8 +201,8 @@ export function validateMenuItemForm(input: {
   description: string;
   basePrice: string;
   isVeg: boolean;
-  packageSize: string;
-  gstPct: string;
+  packageSize?: string;
+  gstPct?: string;
 }):
   | { ok: true; value: CreateMenuItemRequest }
   | { ok: false; message: string } {
@@ -218,7 +233,7 @@ export function validateMenuItemForm(input: {
       description: description || null,
       basePrice: rounded,
       isVeg: input.isVeg,
-      packageSize: input.packageSize.trim() || null,
+      packageSize: input.packageSize ? input.packageSize.trim() || null : null,
       gstPct: input.gstPct ? Number(input.gstPct) : 0,
     },
   };

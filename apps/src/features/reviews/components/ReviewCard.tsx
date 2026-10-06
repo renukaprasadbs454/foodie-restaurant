@@ -22,9 +22,11 @@ export function ReviewCard({ review, onPress }: Props) {
   const { tokens } = useTheme();
   const ext = review as ExtendedReview;
 
-  const rating = Number(review.restaurantRating) || 5;
+  const rating = Number(review.restaurantRating ?? review.rating) || 5;
   const starsString = '★'.repeat(Math.min(5, Math.max(1, Math.round(rating))));
   const customerDisplayName = ext.customerName ?? 'Verified Customer';
+
+  const dateStr = review.createdAt || review.date;
 
   return (
     <Pressable
@@ -90,7 +92,7 @@ export function ReviewCard({ review, onPress }: Props) {
             </View>
 
             <Text variant="caption" color={tokens.color.textSecondary}>
-              📅 {review.createdAt ? new Date(review.createdAt).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) : 'Recent Order'}
+              📅 {dateStr ? new Date(dateStr).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) : 'Recent Order'}
             </Text>
           </View>
         </View>

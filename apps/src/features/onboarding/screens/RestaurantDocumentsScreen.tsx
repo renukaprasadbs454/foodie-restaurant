@@ -33,6 +33,37 @@ type Props = NativeStackScreenProps<
 const BRAND_PRIMARY = '#14532D';
 const BRAND_ACCENT = '#F59E0B';
 
+
+function formatTo24HourTime(timeStr?: string | null): string {
+  if (!timeStr || !timeStr.trim()) return '09:00:00';
+  const trimmed = timeStr.trim();
+  
+  const match24 = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (match24) {
+    const h = match24[1].padStart(2, '0');
+    const m = match24[2];
+    const s = match24[3] || '00';
+    return `${h}:${m}:${s}`;
+  }
+
+  const match12 = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)$/i);
+  if (match12) {
+    let hours = parseInt(match12[1], 10);
+    const minutes = match12[2];
+    const seconds = match12[3] || '00';
+    const ampm = match12[4].toUpperCase();
+
+    if (ampm === 'PM' && hours < 12) {
+      hours += 12;
+    } else if (ampm === 'AM' && hours === 12) {
+      hours = 0;
+    }
+    return `${hours.toString().padStart(2, '0')}:${minutes}:${seconds}`;
+  }
+
+  return trimmed;
+}
+
 const TIME_OPTIONS = Array.from({ length: 48 }).map((_, i) => {
   const hours24 = Math.floor(i / 2);
   const minutes = (i % 2) * 30;
@@ -45,7 +76,7 @@ const TIME_OPTIONS = Array.from({ length: 48 }).map((_, i) => {
 
 const TimeSelect = ({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) => {
   const [modalVisible, setModalVisible] = useState(false);
-  const selectedOption = TIME_OPTIONS.find(o => o.value === value) || TIME_OPTIONS[0];
+  const selectedOption = TIME_OPTIONS.find(o => o.value === value || o.label === value || o.value === formatTo24HourTime(value)) || TIME_OPTIONS[0];
 
   return (
     <View style={{ flex: 1 }}>
@@ -321,8 +352,8 @@ export function RestaurantDocumentsScreen({ navigation }: Props) {
                   setToast({ message: 'Connect to the internet to save timings.', variant: 'warning' });
                   return;
                 }
-                const isoOpenTime = openTime;
-                const isoCloseTime = closeTime;
+                const isoOpenTime = formatTo24HourTime(openTime);
+      const isoCloseTime = formatTo24HourTime(closeTime);
                 try {
                   await updateTimings({ openTime: isoOpenTime, closeTime: isoCloseTime, openDays }).unwrap();
                   trackAnalyticsEvent('restaurant_registration_timings_saved');

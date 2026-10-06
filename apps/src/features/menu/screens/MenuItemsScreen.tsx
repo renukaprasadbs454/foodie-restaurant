@@ -523,7 +523,12 @@ export function MenuItemsScreen({ navigation }: Props) {
           'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80',
         packageSize: formPackageSize || null,
         gstPct: formGstPct ? Number(formGstPct) : null,
-        rating: 5.0,
+        rating: 0.0,
+          avg_rating: 0.0,
+          avgRating: 0.0,
+          average_rating: 0.0,
+          review_count: 0,
+          reviewCount: 0,
         variants: formVariants,
         createdAt: Date.now(),
       };
@@ -925,7 +930,7 @@ export function MenuItemsScreen({ navigation }: Props) {
                       <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, gap: 4 }}>
                         <Text style={{ fontSize: 12 }}>⭐</Text>
                         <Text variant="caption" style={{ fontWeight: 'bold', fontSize: 11 }}>
-                          {item.rating}
+                          {(item.avg_rating ?? item.average_rating ?? item.rating ?? 0) > 0 ? (item.avg_rating ?? item.average_rating ?? item.rating).toFixed(1) : '0.0'}
                         </Text>
                       </View>
 

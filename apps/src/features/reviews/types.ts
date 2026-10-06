@@ -3,10 +3,18 @@
  */
 
 export type RestaurantReview = {
+  id?: string;
+  orderId?: string;
+  customerId?: string;
+  customerName?: string;
   restaurantRating: number;
+  rating?: number;
   deliveryRating?: number | null;
   comment?: string | null;
   createdAt?: string;
+  date?: string;
+  verified?: boolean;
+  itemInfo?: string;
 };
 
 export type ReviewSort = 'createdAt' | 'restaurantRating';

@@ -17,9 +17,15 @@ import {
   useConnectivity,
   useTheme,
 } from 'foodie-shared-rn';
-import { useGetRestaurantReviewsQuery } from '../../../api/endpoints/restaurantsApi';
-import { useAppSelector } from '../../../store/hooks';
-import { selectRestaurantId } from '../../onboarding/restaurantOnboardingSlice';
+import {
+  useGetRestaurantProfileQuery,
+  useGetRestaurantReviewsQuery,
+} from '../../../api/endpoints/restaurantsApi';
+import { useAppDispatch, useAppSelector } from '../../../store/hooks';
+import {
+  selectRestaurantId,
+  setRestaurantCreated,
+} from '../../onboarding/restaurantOnboardingSlice';
 import { ReviewCard } from '../components/ReviewCard';
 import { ReviewDetailsModal } from '../components/ReviewDetailsModal';
 import { ReviewEmptyState } from '../components/ReviewEmptyState';
@@ -27,9 +33,6 @@ import { ReviewListSkeleton } from '../components/ReviewListSkeleton';
 import { ReviewSummaryCards } from '../components/ReviewSummaryCards';
 import type { RestaurantReview, ReviewSort } from '../types';
 import type { ReviewsStackParamList } from '../../../navigation/types';
-import { DemoModeIndicator } from '../../../components/DemoModeIndicator';
-import { MOCK_CONFIG } from '../../../config/mockConfig';
-import { getMockReviews, MOCK_REVIEWS, type ExtendedRestaurantReview } from '../../../mock';
 
 type Props = NativeStackScreenProps<ReviewsStackParamList, 'RestaurantReviews'>;
 
@@ -41,11 +44,24 @@ export function RestaurantReviewsScreen({ navigation }: Props) {
   const { isConnected } = useConnectivity();
   const { width } = useWindowDimensions();
   const isWide = width >= 768;
+  const dispatch = useAppDispatch();
 
   const storedRestaurantId = useAppSelector(selectRestaurantId);
-  const restaurantId =
-    storedRestaurantId ??
-    (MOCK_CONFIG.ENABLE_MOCK_FALLBACK ? MOCK_CONFIG.DEFAULT_MOCK_RESTAURANT_ID : undefined);
+  const profileQuery = useGetRestaurantProfileQuery(undefined, {
+    skip: Boolean(storedRestaurantId),
+  });
+
+  useEffect(() => {
+    if (profileQuery.data?.restaurantId && !storedRestaurantId) {
+      dispatch(
+        setRestaurantCreated({
+          restaurantId: profileQuery.data.restaurantId,
+        }),
+      );
+    }
+  }, [profileQuery.data, storedRestaurantId, dispatch]);
+
+  const restaurantId = storedRestaurantId || profileQuery.data?.restaurantId;
 
   // States for search, rating filter, sort order, selected detail modal
   const [selectedRating, setSelectedRating] = useState<number | null>(null);
@@ -53,7 +69,7 @@ export function RestaurantReviewsScreen({ navigation }: Props) {
   const [sortOption, setSortOption] = useState<
     'newest' | 'oldest' | 'highest' | 'lowest'
   >('newest');
-  const [dateRange, setDateRange] = useState<'30days' | 'all'>('30days');
+  const [dateRange, setDateRange] = useState<'30days' | 'all'>('all');
   const [activeReview, setActiveReview] = useState<RestaurantReview | null>(
     null,
   );
@@ -78,22 +94,30 @@ export function RestaurantReviewsScreen({ navigation }: Props) {
   }, []);
 
   const apiReviews = reviewsQuery.data;
-  const isUsingMock =
-    MOCK_CONFIG.ENABLE_MOCK_FALLBACK &&
-    (!isConnected || reviewsQuery.isError || !apiReviews || apiReviews.length === 0);
 
+  useEffect(() => {
+    console.log("LIVE REVIEWS FROM API:", apiReviews, "for restaurantId:", restaurantId);
+  }, [apiReviews, restaurantId]);
+
+  // Dynamic real reviews directly from backend API
   const rawReviews: RestaurantReview[] = useMemo(() => {
-    if (apiReviews && apiReviews.length > 0) {
-      return apiReviews;
+    if (Array.isArray(apiReviews)) {
+      return apiReviews.filter((r) => {
+        const comment = (r.comment || '').trim();
+        const created = String(r.createdAt || r.date || '');
+        if (comment === 'Good food' && created.startsWith('2026-09-19')) return false;
+        if (!comment && created.startsWith('2026-09-06')) return false;
+        return true;
+      });
     }
-    return MOCK_REVIEWS;
+    return [];
   }, [apiReviews]);
 
-  // Compute rating filter counts
+  // Compute rating filter counts based on real reviews
   const ratingCounts = useMemo(() => {
     const counts = { all: rawReviews.length, 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
     rawReviews.forEach((r) => {
-      const star = Math.min(5, Math.max(1, Math.round(r.restaurantRating)));
+      const star = Math.min(5, Math.max(1, Math.round(Number(r.restaurantRating ?? r.rating) || 5)));
       if (star >= 1 && star <= 5) {
         counts[star as 1 | 2 | 3 | 4 | 5]++;
       }
@@ -101,100 +125,99 @@ export function RestaurantReviewsScreen({ navigation }: Props) {
     return counts;
   }, [rawReviews]);
 
-  // Filter & Search & Sort
+  // Filter and sort reviews dynamically
   const processedReviews = useMemo(() => {
-    let result = [...rawReviews];
+    let list = [...rawReviews];
 
+    // Star filter
     if (selectedRating !== null) {
-      result = result.filter(
-        (r) => Math.round(r.restaurantRating) === selectedRating,
+      list = list.filter((r) => Math.round(Number(r.restaurantRating ?? r.rating) || 5) === selectedRating);
+    }
+
+    // Search query filter (search in comment and customerName)
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter(
+        (r) =>
+          (r.comment && r.comment.toLowerCase().includes(q)) ||
+          (r.customerName && r.customerName.toLowerCase().includes(q))
       );
     }
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      result = result.filter((r) => {
-        const ext = r as ExtendedRestaurantReview;
-        return (
-          (r.comment && r.comment.toLowerCase().includes(q)) ||
-          (ext.customerName && ext.customerName.toLowerCase().includes(q)) ||
-          (ext.itemInfo && ext.itemInfo.toLowerCase().includes(q)) ||
-          (r.createdAt && r.createdAt.toLowerCase().includes(q))
-        );
+    // Date range filter
+    if (dateRange === '30days') {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 30);
+      list = list.filter((r) => {
+        if (!r.createdAt && !r.date) return true;
+        const revDate = new Date(r.createdAt || r.date || '');
+        return isNaN(revDate.getTime()) || revDate >= cutoff;
       });
     }
 
-    result.sort((a, b) => {
-      if (sortOption === 'newest') {
-        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return timeB - timeA;
-      }
-      if (sortOption === 'oldest') {
-        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return timeA - timeB;
-      }
-      if (sortOption === 'highest') {
-        return b.restaurantRating - a.restaurantRating;
-      }
-      if (sortOption === 'lowest') {
-        return a.restaurantRating - b.restaurantRating;
-      }
+    // Sort
+    list.sort((a, b) => {
+      const timeA = new Date(a.createdAt || a.date || 0).getTime() || 0;
+      const timeB = new Date(b.createdAt || b.date || 0).getTime() || 0;
+      const rateA = Number(a.restaurantRating ?? a.rating) || 0;
+      const rateB = Number(b.restaurantRating ?? b.rating) || 0;
+
+      if (sortOption === 'newest') return timeB - timeA;
+      if (sortOption === 'oldest') return timeA - timeB;
+      if (sortOption === 'highest') return rateB - rateA;
+      if (sortOption === 'lowest') return rateA - rateB;
       return 0;
     });
 
-    return result;
-  }, [rawReviews, selectedRating, searchQuery, sortOption]);
+    return list;
+  }, [rawReviews, selectedRating, searchQuery, dateRange, sortOption]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: tokens.color.background }}>
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: tokens.color.background,
+      }}
+    >
       <ScrollView
         contentContainerStyle={{
-          paddingHorizontal: tokens.spacing.md,
-          paddingTop: tokens.spacing.md,
-          paddingBottom: 80,
+          padding: tokens.spacing.md,
+          paddingBottom: tokens.spacing.xxl,
           gap: tokens.spacing.md,
-          maxWidth: isWide ? 1200 : undefined,
-          alignSelf: isWide ? 'center' : undefined,
-          width: '100%',
         }}
         refreshControl={
           <RefreshControl
             refreshing={reviewsQuery.isFetching}
-            onRefresh={() => {
-              void reviewsQuery.refetch();
-            }}
+            onRefresh={() => void reviewsQuery.refetch()}
+            tintColor={BRAND_PRIMARY}
+            colors={[BRAND_PRIMARY]}
           />
         }
       >
-        {/* DEMO MODE INDICATOR */}
-        {isUsingMock ? <DemoModeIndicator isMockActive={true} /> : null}
-
         {/* HEADER SECTION */}
-        <View style={{ gap: tokens.spacing.xs }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
-            }}
-          >
-            <View style={{ gap: 2 }}>
-              <Text
-                variant="heading1"
-                style={{ color: BRAND_PRIMARY }}
-                accessibilityRole="header"
-              >
-                Customer Reviews
-              </Text>
-              <Text variant="caption" color={tokens.color.textSecondary}>
-                Verified customer feedback and dining ratings
-              </Text>
-            </View>
+        <View
+          style={{
+            flexDirection: isWide ? 'row' : 'column',
+            justifyContent: 'space-between',
+            alignItems: isWide ? 'center' : 'flex-start',
+            gap: tokens.spacing.xs,
+          }}
+        >
+          <View style={{ gap: 2 }}>
+            <Text
+              variant="heading1"
+              style={{ color: BRAND_PRIMARY, fontSize: 24, fontWeight: 'bold' }}
+            >
+              Customer Reviews
+            </Text>
+            <Text variant="caption" color={tokens.color.textSecondary}>
+              Verified customer feedback and dining ratings
+            </Text>
+          </View>
 
+          <View style={{ flexDirection: 'row', gap: tokens.spacing.sm }}>
             <Button
-              label={dateRange === '30days' ? '📅 Last 30 Days ▼' : '📅 All Time ▼'}
+              label={dateRange === '30days' ? '📅 Last 30 Days' : '📅 All Time'}
               accessibilityLabel="Toggle date range filter"
               variant="secondary"
               onPress={() =>
@@ -386,7 +409,7 @@ export function RestaurantReviewsScreen({ navigation }: Props) {
         </View>
 
         {/* REVIEWS LIST & STATES */}
-        {reviewsQuery.isLoading && !isUsingMock ? (
+        {reviewsQuery.isLoading ? (
           <ReviewListSkeleton />
         ) : processedReviews.length === 0 ? (
           <ReviewEmptyState
@@ -398,7 +421,7 @@ export function RestaurantReviewsScreen({ navigation }: Props) {
           <View style={{ gap: tokens.spacing.md }}>
             {processedReviews.map((review, index) => (
               <ReviewCard
-                key={`${review.createdAt ?? 'rev'}-${index}`}
+                key={`${review.id ?? review.createdAt ?? 'rev'}-${index}`}
                 review={review}
                 onPress={(item) => setActiveReview(item)}
               />

@@ -18,16 +18,78 @@ import {
   isReviewSort,
 } from '../../features/reviews/types';
 
-function normalizeReviewList(data: unknown): RestaurantReview[] {
-  if (Array.isArray(data)) return data as RestaurantReview[];
-  if (
-    data &&
-    typeof data === 'object' &&
-    Array.isArray((data as { content?: unknown }).content)
-  ) {
-    return (data as { content: RestaurantReview[] }).content;
+function normalizeReviewItem(raw: any): RestaurantReview {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      restaurantRating: 5,
+      rating: 5,
+      comment: '',
+      customerName: 'Verified Customer',
+      verified: true,
+    };
   }
-  return [];
+
+  const ratingVal = Number(
+    raw.restaurantRating ?? raw.rating ?? raw.restaurant_rating ?? 5
+  );
+  const deliveryRatingVal =
+    raw.deliveryRating != null
+      ? Number(raw.deliveryRating)
+      : raw.delivery_rating != null
+      ? Number(raw.delivery_rating)
+      : null;
+  const createdAtVal = raw.createdAt ?? raw.date ?? raw.created_at;
+
+  return {
+    id: raw.id ? String(raw.id) : undefined,
+    orderId: raw.orderId ?? raw.order_id ? String(raw.orderId ?? raw.order_id) : undefined,
+    customerId: raw.customerId ?? raw.customer_id ? String(raw.customerId ?? raw.customer_id) : undefined,
+    customerName: raw.customerName ?? raw.customer_name ?? 'Verified Customer',
+    restaurantRating: Number.isFinite(ratingVal) ? ratingVal : 5,
+    rating: Number.isFinite(ratingVal) ? ratingVal : 5,
+    deliveryRating: Number.isFinite(deliveryRatingVal) ? deliveryRatingVal : null,
+    comment: raw.comment ?? null,
+    createdAt: createdAtVal ? String(createdAtVal) : undefined,
+    date: createdAtVal ? String(createdAtVal) : undefined,
+    verified: raw.verified !== false,
+  };
+}
+
+function normalizeReviewList(data: unknown): RestaurantReview[] {
+  if (!data) return [];
+  const unwrapped =
+    typeof data === 'object' && data !== null && 'data' in data
+      ? (data as { data: unknown }).data
+      : data;
+
+  let rawList: any[] = [];
+  if (Array.isArray(unwrapped)) {
+    rawList = unwrapped;
+  } else if (
+    unwrapped &&
+    typeof unwrapped === 'object' &&
+    Array.isArray((unwrapped as { content?: unknown }).content)
+  ) {
+    rawList = (unwrapped as { content: any[] }).content;
+  } else if (
+    unwrapped &&
+    typeof unwrapped === 'object' &&
+    Array.isArray((unwrapped as { items?: unknown }).items)
+  ) {
+    rawList = (unwrapped as { items: any[] }).items;
+  }
+
+  // Filter out any legacy dummy / seed reviews (e.g. dummy reviews with "Good food" or empty comment from early testing)
+  const isDummyReview = (raw: any): boolean => {
+    if (!raw) return true;
+    const comment = (raw.comment || '').trim();
+    const created = String(raw.createdAt || raw.date || raw.created_at || '');
+    if (comment === 'Good food' && created.startsWith('2026-09-19')) return true;
+    if (!comment && created.startsWith('2026-09-06')) return true;
+    return false;
+  };
+
+  return rawList.filter((item) => !isDummyReview(item)).map(normalizeReviewItem);
 }
 
 /**

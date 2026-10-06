@@ -15,7 +15,7 @@ export function ReviewEmptyState({ ratingFilter, onRefresh, isFetching }: Props)
 
   const title = ratingFilter
     ? `No ${ratingFilter}-Star Reviews Yet`
-    : 'No Customer Reviews Yet';
+    : 'No reviews yet from customers';
 
   const description = ratingFilter
     ? `No customer reviews currently match the ${ratingFilter}-star rating filter.`
