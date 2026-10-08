@@ -28,6 +28,7 @@ export type MenuItem = {
   avg_rating?: number | null;
   avgRating?: number | null;
   average_rating?: number | null;
+  averageRating?: number | null;
   review_count?: number | null;
   reviewCount?: number | null;
   preparationTime?: string;
@@ -51,6 +52,7 @@ export type NormalizedMenuItem = {
   avg_rating: number;
   avgRating: number;
   average_rating: number;
+  averageRating: number;
   review_count: number;
   reviewCount: number;
   preparationTime: string;
@@ -82,6 +84,15 @@ export function normalizeMenuItem(
 ): NormalizedMenuItem {
   const foodType = determineFoodType(raw.foodType, raw.isVeg, raw.name, raw.description);
   const isVeg = foodType === 'VEG';
+  const rawCount = raw.reviewCount ?? raw.review_count ?? 0;
+  const countNum = Number(rawCount);
+  const validCount = Number.isFinite(countNum) ? countNum : 0;
+
+  // STRICT PER-FOOD RATING: Only foods with >= 1 order review show a non-zero rating
+  const rawRating = validCount > 0 ? (raw.averageRating ?? raw.avgRating ?? raw.avg_rating ?? raw.average_rating ?? 0) : 0;
+  const ratingNum = Number(rawRating);
+  const validRating = Number.isFinite(ratingNum) && validCount > 0 ? ratingNum : 0;
+
   return {
     menuItemId: raw.menuItemId || raw.id || `m-${Math.random().toString(36).substring(2, 9)}`,
     name: raw.name || 'Unnamed Item',
@@ -93,12 +104,13 @@ export function normalizeMenuItem(
     foodType,
     isVeg,
     isAvailable: typeof raw.isAvailable === 'boolean' ? raw.isAvailable : true,
-    rating: Number.isFinite(raw.avg_rating) ? Number(raw.avg_rating) : (Number.isFinite(raw.avgRating) ? Number(raw.avgRating) : (Number.isFinite(raw.average_rating) ? Number(raw.average_rating) : (typeof raw.rating === 'number' && Number.isFinite(raw.rating) ? raw.rating : 0))),
-    avg_rating: Number.isFinite(raw.avg_rating) ? Number(raw.avg_rating) : (Number.isFinite(raw.avgRating) ? Number(raw.avgRating) : (Number.isFinite(raw.average_rating) ? Number(raw.average_rating) : (typeof raw.rating === 'number' && Number.isFinite(raw.rating) ? raw.rating : 0))),
-    avgRating: Number.isFinite(raw.avg_rating) ? Number(raw.avg_rating) : (Number.isFinite(raw.avgRating) ? Number(raw.avgRating) : (Number.isFinite(raw.average_rating) ? Number(raw.average_rating) : (typeof raw.rating === 'number' && Number.isFinite(raw.rating) ? raw.rating : 0))),
-    average_rating: Number.isFinite(raw.avg_rating) ? Number(raw.avg_rating) : (Number.isFinite(raw.avgRating) ? Number(raw.avgRating) : (Number.isFinite(raw.average_rating) ? Number(raw.average_rating) : (typeof raw.rating === 'number' && Number.isFinite(raw.rating) ? raw.rating : 0))),
-    review_count: Number.isFinite(raw.review_count) ? Number(raw.review_count) : (Number.isFinite(raw.reviewCount) ? Number(raw.reviewCount) : 0),
-    reviewCount: Number.isFinite(raw.review_count) ? Number(raw.review_count) : (Number.isFinite(raw.reviewCount) ? Number(raw.reviewCount) : 0),
+    rating: validRating,
+    avg_rating: validRating,
+    avgRating: validRating,
+    average_rating: validRating,
+    averageRating: validRating,
+    review_count: validCount,
+    reviewCount: validCount,
     preparationTime: raw.preparationTime || '15 min',
     variants: Array.isArray(raw.variants) ? raw.variants : [],
     createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : Date.now(),

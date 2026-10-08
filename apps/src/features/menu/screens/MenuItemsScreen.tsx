@@ -34,7 +34,7 @@ import {
   useUpdateMenuItemMutation,
   useUploadMenuItemImageMutation,
 } from '../../../api/endpoints/menuApi';
-import { useGetRestaurantProfileQuery } from '../../../api/endpoints/restaurantsApi';
+import { useGetRestaurantProfileQuery, useGetRestaurantReviewsQuery } from '../../../api/endpoints/restaurantsApi';
 import { useAppDispatch, useAppSelector } from '../../../store/hooks';
 import { ENV } from '../../../constants/env';
 import {
@@ -221,6 +221,11 @@ export function MenuItemsScreen({ navigation }: Props) {
     refetchOnFocus: true,
   });
 
+  const reviewsQuery = useGetRestaurantReviewsQuery(
+    { restaurantId: restaurantId ?? '', page: 0, size: 100 },
+    { skip: !restaurantId, refetchOnFocus: true }
+  );
+
   const [createCategory] = useCreateCategoryMutation();
   const [createItem, createItemState] = useCreateMenuItemMutation();
   const [updateItem, updateItemState] = useUpdateMenuItemMutation();
@@ -244,6 +249,7 @@ export function MenuItemsScreen({ navigation }: Props) {
       if (itemsList.length > 0) {
         setMenuItems(itemsList);
         setIsInitialized(true);
+        console.log("LIVE MENU RATINGS:", itemsList);
         return;
       }
     }
@@ -257,10 +263,11 @@ export function MenuItemsScreen({ navigation }: Props) {
           }
         }
         setMenuItems(mockItems);
+        console.log("LIVE MENU RATINGS:", mockItems);
       }
       setIsInitialized(true);
     }
-  }, [menuQuery.data, isUsingMock, menuQuery.isLoading, isInitialized]);
+  }, [menuQuery.data, isUsingMock, isInitialized]);
 
   useEffect(() => {
     trackAnalyticsEvent('restaurant_menu_management_viewed');
@@ -293,11 +300,27 @@ export function MenuItemsScreen({ navigation }: Props) {
     const total = menuItems.length;
     const available = menuItems.filter((i) => i.isAvailable).length;
     const outOfStock = total - available;
-    const totalRating = menuItems.reduce((acc, i) => acc + (i.rating || 4.5), 0);
-    const avgRating = total > 0 ? (totalRating / total).toFixed(1) : '4.5';
+
+    let avgRating = '0.0';
+    if (reviewsQuery.data && Array.isArray(reviewsQuery.data) && reviewsQuery.data.length > 0) {
+      const validReviews = reviewsQuery.data.filter((r) =>
+        Number.isFinite(Number(r.restaurantRating ?? r.rating))
+      );
+      if (validReviews.length > 0) {
+        const sum = validReviews.reduce(
+          (acc, r) => acc + Number(r.restaurantRating ?? r.rating),
+          0
+        );
+        avgRating = (sum / validReviews.length).toFixed(1);
+      }
+    } else if (menuQuery.data && (menuQuery.data as any).avgRating != null && Number((menuQuery.data as any).avgRating) > 0) {
+      avgRating = Number((menuQuery.data as any).avgRating).toFixed(1);
+    } else if (profileQuery.data?.avgRating != null && Number(profileQuery.data.avgRating) > 0) {
+      avgRating = Number(profileQuery.data.avgRating).toFixed(1);
+    }
 
     return { total, available, outOfStock, avgRating };
-  }, [menuItems]);
+  }, [menuItems, reviewsQuery.data, menuQuery.data, profileQuery.data]);
 
   // Derived filtered & sorted items list
   const filteredAndSortedItems = useMemo(() => {
@@ -321,7 +344,11 @@ export function MenuItemsScreen({ navigation }: Props) {
     } else if (sortBy === 'price-desc') {
       sorted.sort((a, b) => b.basePrice - a.basePrice);
     } else if (sortBy === 'rating') {
-      sorted.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+      sorted.sort((a, b) => {
+        const rateA = (a.reviewCount > 0 || a.review_count > 0) ? (a.averageRating ?? a.avgRating ?? 0) : 0;
+        const rateB = (b.reviewCount > 0 || b.review_count > 0) ? (b.averageRating ?? b.avgRating ?? 0) : 0;
+        return rateB - rateA;
+      });
     } else if (sortBy === 'newest') {
       sorted.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     }
@@ -527,6 +554,7 @@ export function MenuItemsScreen({ navigation }: Props) {
           avg_rating: 0.0,
           avgRating: 0.0,
           average_rating: 0.0,
+          averageRating: 0.0,
           review_count: 0,
           reviewCount: 0,
         variants: formVariants,
@@ -853,7 +881,12 @@ export function MenuItemsScreen({ navigation }: Props) {
                 }}
               />
             }
-            renderItem={({ item }) => (
+            renderItem={({ item }) => {
+              const reviewCount = Number(item.reviewCount ?? item.review_count ?? 0);
+              const rawRating = Number(item.averageRating ?? item.avgRating ?? item.avg_rating ?? 0);
+              const displayRating = (reviewCount > 0 && Number.isFinite(rawRating) && rawRating > 0) ? rawRating.toFixed(1) : '0.0';
+
+              return (
               <Card
                 style={{
                   padding: tokens.spacing.md,
@@ -930,7 +963,7 @@ export function MenuItemsScreen({ navigation }: Props) {
                       <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, gap: 4 }}>
                         <Text style={{ fontSize: 12 }}>⭐</Text>
                         <Text variant="caption" style={{ fontWeight: 'bold', fontSize: 11 }}>
-                          {(item.avg_rating ?? item.average_rating ?? item.rating ?? 0) > 0 ? (item.avg_rating ?? item.average_rating ?? item.rating).toFixed(1) : '0.0'}
+                          {displayRating}
                         </Text>
                       </View>
 
@@ -1014,7 +1047,8 @@ export function MenuItemsScreen({ navigation }: Props) {
                   </View>
                 </View>
               </Card>
-            )}
+              );
+            }}
           />
         )}
       </ScrollView>
