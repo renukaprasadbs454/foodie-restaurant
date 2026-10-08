@@ -16,6 +16,14 @@ import type {
  */
 export const menuApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
+    getMenuItemsWithRatings: builder.query<MenuItem[], string>({
+      query: (restaurantId) => `/api/v1/restaurants/${restaurantId}/menu-items-with-ratings`,
+      providesTags: (_result, _error, restaurantId) => [
+        { type: 'Menu', id: restaurantId },
+        { type: 'Menu', id: 'LIST' },
+      ],
+      keepUnusedDataFor: 120,
+    }),
     getMenu: builder.query<FullMenu, string>({
       query: (restaurantId) => `/api/v1/menu/restaurants/${restaurantId}`,
       providesTags: (_result, _error, restaurantId) => [
@@ -170,6 +178,7 @@ export const menuApi = baseApi.injectEndpoints({
 
 export const {
   useGetMenuQuery,
+  useGetMenuItemsWithRatingsQuery,
   useCreateCategoryMutation,
   useCreateMenuItemMutation,
   useUpdateMenuItemMutation,
