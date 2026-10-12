@@ -14,6 +14,9 @@ import {
   useTheme,
 } from 'foodie-shared-rn';
 import { useGetNotificationsQuery } from '../../../api/endpoints/notificationsApi';
+import { useGetRestaurantProfileQuery } from '../../../api/endpoints/restaurantsApi';
+import { selectRestaurantId } from '../../onboarding/restaurantOnboardingSlice';
+import { RestaurantSupportModal } from '../components/RestaurantSupportModal';
 import { selectUserId } from '../../auth/authSlice';
 import { logoutRestaurant } from '../../auth/session';
 import {
@@ -55,7 +58,9 @@ export function RestaurantSettingsScreen({ navigation }: Props) {
   const [activeModal, setActiveModal] = useState<
     'help' | 'contact' | 'privacy' | 'terms' | null
   >(null);
-
+  const storedRestaurantId = useAppSelector(selectRestaurantId);
+  const { data: profile } = useGetRestaurantProfileQuery(undefined, { skip: false });
+  const [supportChatVisible, setSupportChatVisible] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
     variant: 'info' | 'success' | 'error' | 'warning';
@@ -279,6 +284,13 @@ export function RestaurantSettingsScreen({ navigation }: Props) {
           </Text>
 
           <ListItem
+            title="💬 Live Admin Chat"
+            subtitle="Chat directly with Foodie Admin Support desk in real time"
+            accessibilityLabel="Live Admin Chat"
+            onPress={() => setSupportChatVisible(true)}
+          />
+
+          <ListItem
             title="❓ Help & Support"
             subtitle="Merchant FAQs, order handling & menu tips"
             accessibilityLabel="Help & Support"
@@ -380,6 +392,16 @@ export function RestaurantSettingsScreen({ navigation }: Props) {
           </Card>
 
           <Button
+            label="💬 Chat with Live Support Agent"
+            accessibilityLabel="Chat with live support agent"
+            style={{ backgroundColor: BRAND_PRIMARY }}
+            onPress={() => {
+              setActiveModal(null);
+              setSupportChatVisible(true);
+            }}
+          />
+
+          <Button
             label="Close Guide"
             accessibilityLabel="Close help modal"
             variant="secondary"
@@ -423,6 +445,16 @@ export function RestaurantSettingsScreen({ navigation }: Props) {
               Response within 2 hours for account & payment inquiries
             </Text>
           </Card>
+
+          <Button
+            label="💬 Open Live Admin Chat"
+            accessibilityLabel="Open live support chat"
+            style={{ backgroundColor: BRAND_PRIMARY }}
+            onPress={() => {
+              setActiveModal(null);
+              setSupportChatVisible(true);
+            }}
+          />
 
           <Button
             label="Close Contact Info"
@@ -523,6 +555,14 @@ export function RestaurantSettingsScreen({ navigation }: Props) {
           </View>
         </View>
       </Modal>
+
+      {/* RESTAURANT LIVE SUPPORT CHAT MODAL */}
+      <RestaurantSupportModal
+        visible={supportChatVisible}
+        onClose={() => setSupportChatVisible(false)}
+        restaurantId={profile?.restaurantId || storedRestaurantId || undefined}
+        restaurantName={profile?.name || 'Restaurant Partner'}
+      />
 
       <Toast
         visible={Boolean(toast)}

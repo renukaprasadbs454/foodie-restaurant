@@ -150,7 +150,11 @@ export function RestaurantSupportModal({
     }
 
     // Match exact restaurantId
-    if (currentRestaurantId && c.restaurantId && String(c.restaurantId).trim() === String(currentRestaurantId).trim()) {
+    if (currentRestaurantId && c.restaurantId && String(c.restaurantId).trim().toLowerCase() === String(currentRestaurantId).trim().toLowerCase()) {
+      return true;
+    }
+
+    if (currentRestaurantId && c.customerId && String(c.customerId).trim().toLowerCase() === String(currentRestaurantId).trim().toLowerCase()) {
       return true;
     }
 
@@ -172,6 +176,11 @@ export function RestaurantSupportModal({
       if (c.id === 'ENQ-869CA402' && currNameNorm.includes('shivam')) {
         return true;
       }
+    }
+
+    // Fallback: If fetched from authenticated /api/v1/support/conversations endpoint and has no conflict:
+    if (!c.restaurantId || !currentRestaurantId || String(c.restaurantId).toLowerCase() === String(currentRestaurantId).toLowerCase()) {
+      return true;
     }
 
     return false;
@@ -287,8 +296,10 @@ export function RestaurantSupportModal({
         senderName: currentRestaurantName,
         senderType: 'RESTAURANT',
       }).unwrap();
-    } catch {
-      setToast({ message: 'Failed to deliver message', variant: 'error' });
+      refetchConversations();
+    } catch (err: any) {
+      const errMsg = err?.data?.message || err?.message || 'Failed to deliver message. Please try again.';
+      setToast({ message: errMsg, variant: 'error' });
       setChatInput(textToSend);
     } finally {
       setIsSending(false);
@@ -490,43 +501,72 @@ export function RestaurantSupportModal({
                     paddingHorizontal: 12,
                     paddingVertical: 10,
                     marginTop: 8,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
                     gap: 10,
                   }}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Feather name="check-circle" size={16} color="#16A34A" />
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 12, color: '#15803D', fontWeight: '700' }}>
                         Enquiry resolved by Admin Support
                       </Text>
                       <Text style={{ fontSize: 11, color: '#166534', marginTop: 2 }}>
-                        Need further help? Start a new chat or reply to reopen.
+                        Need further help? Reopen this enquiry or reply below to continue chatting.
                       </Text>
                     </View>
                   </View>
-                  <Pressable
-                    onPress={() => {
-                      setActiveEnquiryId(null);
-                      setIsCreatingNew(true);
-                    }}
-                    style={{
-                      backgroundColor: '#15803D',
-                      paddingHorizontal: 12,
-                      paddingVertical: 7,
-                      borderRadius: 10,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 4,
-                    }}
-                  >
-                    <Feather name="plus" size={14} color="#FFFFFF" />
-                    <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>
-                      New Chat
-                    </Text>
-                  </Pressable>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
+                    <Pressable
+                      onPress={async () => {
+                        try {
+                          await sendMessageMutation({
+                            conversationId: activeEnquiry.id,
+                            message: 'Reopening this enquiry for further assistance.',
+                            senderName: currentRestaurantName,
+                            senderType: 'RESTAURANT',
+                          }).unwrap();
+                          refetchConversations();
+                          setToast({ message: 'Enquiry reopened successfully', variant: 'success' });
+                        } catch {
+                          setToast({ message: 'Failed to reopen enquiry', variant: 'error' });
+                        }
+                      }}
+                      style={{
+                        backgroundColor: '#047857',
+                        paddingHorizontal: 12,
+                        paddingVertical: 7,
+                        borderRadius: 10,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                    >
+                      <Feather name="refresh-cw" size={13} color="#FFFFFF" />
+                      <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>
+                        Reopen Enquiry
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        setActiveEnquiryId(null);
+                        setIsCreatingNew(true);
+                      }}
+                      style={{
+                        backgroundColor: '#15803D',
+                        paddingHorizontal: 12,
+                        paddingVertical: 7,
+                        borderRadius: 10,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                    >
+                      <Feather name="plus" size={14} color="#FFFFFF" />
+                      <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>
+                        New Chat
+                      </Text>
+                    </Pressable>
+                  </View>
                 </View>
               ) : activeEnquiry.status === 'IN_PROGRESS' || activeEnquiry.status === 'AGENT_ACTIVE' ? (
                 <View

@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, useTheme } from 'foodie-shared-rn';
 import Feather from '@expo/vector-icons/Feather';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { selectRestaurantId } from '../features/onboarding/restaurantOnboardingSlice';
+import { selectRestaurantId, setRestaurantCreated } from '../features/onboarding/restaurantOnboardingSlice';
 import { logoutRestaurant } from '../features/auth/session';
 import { store } from '../store/store';
 import { useGetRestaurantProfileQuery, useToggleRestaurantStatusMutation } from '../api/endpoints/restaurantsApi';
@@ -38,13 +38,22 @@ export function RestaurantHeader({
 
   const restaurantId = useAppSelector(selectRestaurantId);
   const dispatch = useAppDispatch();
-  const { data: profile } = useGetRestaurantProfileQuery(undefined, { skip: !restaurantId });
+  const { data: profile } = useGetRestaurantProfileQuery(undefined, { skip: false });
   const [toggleStatus] = useToggleRestaurantStatusMutation();
   const [supportVisible, setSupportVisible] = useState(false);
 
+  useEffect(() => {
+    if (profile?.restaurantId && !restaurantId) {
+      dispatch(setRestaurantCreated({ restaurantId: profile.restaurantId, status: profile.status }));
+    }
+  }, [profile?.restaurantId, profile?.status, restaurantId, dispatch]);
+
+  const effectiveRestaurantId = profile?.restaurantId || restaurantId || '';
+  const effectiveRestaurantName = profile?.name || 'Restaurant Partner';
+
   const notificationsQuery = useGetNotificationsQuery(
     { unreadOnly: true, page: 0, size: 20 },
-    { skip: !restaurantId, pollingInterval: 15000 }
+    { skip: !effectiveRestaurantId, pollingInterval: 15000 }
   );
   const unreadCount = notificationsQuery.data?.length || 0;
 
@@ -52,7 +61,7 @@ export function RestaurantHeader({
 
   const displayTitle: string = title;
   const displaySubtitle: string =
-    subtitle ?? (restaurantId ? `Restaurant #${restaurantId.slice(0, 8)}` : 'Restaurant Partner Portal');
+    subtitle ?? (effectiveRestaurantId ? `Restaurant #${effectiveRestaurantId.slice(0, 8)}` : 'Restaurant Partner Portal');
 
   const canGoBack = showBack || (navigation && typeof navigation.canGoBack === 'function' && navigation.canGoBack());
 
@@ -326,8 +335,8 @@ export function RestaurantHeader({
       <RestaurantSupportModal
         visible={supportVisible}
         onClose={() => setSupportVisible(false)}
-        restaurantId={restaurantId || profile?.restaurantId}
-        restaurantName={profile?.name || displayTitle || 'Restaurant Partner'}
+        restaurantId={effectiveRestaurantId}
+        restaurantName={effectiveRestaurantName}
       />
     </View>
   );

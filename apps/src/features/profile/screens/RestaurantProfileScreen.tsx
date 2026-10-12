@@ -36,6 +36,7 @@ import {
   selectRestaurantId,
   setRestaurantCreated,
 } from '../../onboarding/restaurantOnboardingSlice';
+import { RestaurantSupportModal } from '../components/RestaurantSupportModal';
 import {
   CUISINE_TYPES,
   type CuisineType,
@@ -211,6 +212,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
   const [updateProfile, updateState] = useUpdateRestaurantProfileMutation();
   const [uploadImage] = useUploadRestaurantImagesMutation();
   const [updateTimings, updateTimingsState] = useUpdateTimingsMutation();
+  const [supportModalVisible, setSupportModalVisible] = useState(false);
 
   const DAYS_OF_WEEK = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
@@ -808,6 +810,13 @@ export function RestaurantProfileScreen({ navigation }: Props) {
                   variant="secondary"
                   onPress={() => navigation.navigate('RestaurantSettings')}
                 />
+                <Button
+                  label="💬 Help & Support Chat"
+                  accessibilityLabel="Open help and support chat"
+                  variant="secondary"
+                  style={{ borderColor: BRAND_PRIMARY }}
+                  onPress={() => setSupportModalVisible(true)}
+                />
               </View>
             </Card>
 
@@ -831,6 +840,13 @@ export function RestaurantProfileScreen({ navigation }: Props) {
           </>
         )}
       </ScrollView>
+
+      <RestaurantSupportModal
+        visible={supportModalVisible}
+        onClose={() => setSupportModalVisible(false)}
+        restaurantId={profileData?.restaurantId || restaurantId}
+        restaurantName={profileData?.name || name || 'Restaurant Partner'}
+      />
 
       <Toast
         visible={Boolean(toast)}
