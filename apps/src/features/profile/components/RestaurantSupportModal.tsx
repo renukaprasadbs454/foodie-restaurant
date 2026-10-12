@@ -11,77 +11,212 @@ import {
   Keyboard,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Text, Toast, useTheme } from 'foodie-shared-rn';
+import * as SecureStore from 'expo-secure-store';
+import { Text, Toast } from 'foodie-shared-rn';
 import Feather from '@expo/vector-icons/Feather';
-import { generateSupportReply, getApiEndpoints, postToBackendSync } from '../supportAiEngine';
+
+import { useAppSelector } from '../../../store/hooks';
+import { selectRestaurantId } from '../../onboarding/restaurantOnboardingSlice';
+import { useGetRestaurantProfileQuery } from '../../../api/endpoints/restaurantsApi';
 
 import {
   useGetMyConversationsQuery,
-  useCreateOrGetConversationMutation,
-  useEscalateConversationMutation,
-  useSendMessageMutation,
+  useCreateTicketMutation,
   useGetMessagesQuery,
-  useSyncLegacyChatMutation,
+  useSendMessageMutation,
+  type SupportConversation,
+  type SupportMessage,
 } from '../../../api/endpoints/supportApi';
-
-
 
 interface RestaurantSupportModalProps {
   visible: boolean;
   onClose: () => void;
+  restaurantId?: string;
   restaurantName?: string;
   activeOrderId?: string;
+}
+
+const QUICK_CATEGORIES = [
+  { key: 'PAYOUT', label: '💰 Settlement & Payouts', subject: 'Payout / Settlement Inquiry' },
+  { key: 'ORDER', label: '📦 Order Issue', subject: 'Order / Delivery Partner Issue' },
+  { key: 'MENU', label: '📋 Menu Management', subject: 'Menu Items & Pricing Update' },
+  { key: 'ACCOUNT', label: '⚙️ Account & Business', subject: 'Account & Business Details' },
+  { key: 'OTHER', label: '💬 Other Question', subject: 'General Support Inquiry' },
+];
+
+async function getStoredTicketIds(key: string): Promise<string[]> {
+  try {
+    const isSecureAvailable = await SecureStore.isAvailableAsync();
+    let raw: string | null = null;
+    if (isSecureAvailable) {
+      raw = await SecureStore.getItemAsync(`@foodie_rest_tickets_${key}`);
+    }
+    if (!raw) {
+      raw = await AsyncStorage.getItem(`@foodie_rest_tickets_${key}`);
+    }
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+  return [];
+}
+
+async function setStoredTicketIds(key: string, ids: string[]): Promise<void> {
+  try {
+    const serialized = JSON.stringify(ids);
+    const isSecureAvailable = await SecureStore.isAvailableAsync();
+    if (isSecureAvailable) {
+      await SecureStore.setItemAsync(`@foodie_rest_tickets_${key}`, serialized);
+    }
+    await AsyncStorage.setItem(`@foodie_rest_tickets_${key}`, serialized);
+  } catch {}
 }
 
 export function RestaurantSupportModal({
   visible,
   onClose,
+  restaurantId,
   restaurantName = 'Partner Restaurant',
   activeOrderId,
 }: RestaurantSupportModalProps) {
-  const { tokens } = useTheme();
+  const reduxRestaurantId = useAppSelector(selectRestaurantId);
+  const { data: profile } = useGetRestaurantProfileQuery(undefined, { skip: false });
+
+  const currentRestaurantId = restaurantId || reduxRestaurantId || profile?.restaurantId || '';
+  const currentRestaurantName = (restaurantName && restaurantName !== 'Partner Restaurant' && restaurantName !== 'Restaurant Partner'
+    ? restaurantName
+    : profile?.name) || 'Partner Restaurant';
+
+  const storageKey = (currentRestaurantId || currentRestaurantName).replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+
+  const [trackedTicketIds, setTrackedTicketIds] = useState<string[]>([]);
+  const [activeEnquiryId, setActiveEnquiryId] = useState<string | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
-  const [newSubject, setNewSubject] = useState('');
-  const [newCategory, setNewCategory] = useState<'CUSTOMER' | 'RESTAURANT' | 'DELIVERY' | 'GENERAL'>('RESTAURANT');
+  const [newCategoryKey, setNewCategoryKey] = useState('PAYOUT');
+  const [newSubject, setNewSubject] = useState('Payout / Settlement Inquiry');
   const [newMessageText, setNewMessageText] = useState('');
-  const [newOrderId, setNewOrderId] = useState('');
+  const [newOrderIdInput, setNewOrderIdInput] = useState(activeOrderId || '');
   const [chatInput, setChatInput] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [filterTab, setFilterTab] = useState<'OPEN' | 'RESOLVED' | 'ALL'>('OPEN');
   const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' | 'info' } | null>(null);
+
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Network State
-  const { data: activeConversations } = useGetMyConversationsQuery(undefined, { pollingInterval: 3000 });
-  const [createConversation] = useCreateOrGetConversationMutation();
-  const [escalateConv] = useEscalateConversationMutation();
-  const [sendMessage] = useSendMessageMutation();
-
-  const [activeEnquiryId, setActiveEnquiryId] = useState<string | null>(null);
-  const [localChatMessages, setLocalChatMessages] = useState<any[]>([]);
-
-  // Resolve active locally if needed
-  const activeEnquiry = activeConversations?.find(c => c.id === activeEnquiryId)
-    || (activeConversations && activeConversations.length > 0 ? activeConversations[0] : null);
-
-  const { data: messages } = useGetMessagesQuery(activeEnquiry?.id as string, {
-    skip: !activeEnquiry?.id,
-    pollingInterval: 2000
-  });
   useEffect(() => {
-    if (activeEnquiry && activeEnquiryId !== activeEnquiry.id) {
-      setActiveEnquiryId(activeEnquiry.id);
+    if (visible && storageKey) {
+      getStoredTicketIds(storageKey).then((saved) => {
+        setTrackedTicketIds((prev) => Array.from(new Set([...prev, ...saved])));
+      });
     }
-  }, [activeEnquiry]);
+  }, [visible, storageKey]);
 
+  // Queries & Mutations
+  const { data: conversations, isLoading: isLoadingConversations, refetch: refetchConversations } = useGetMyConversationsQuery(undefined, {
+    skip: !visible,
+    pollingInterval: visible ? 2500 : 0,
+  });
+
+  const [createTicketMutation, { isLoading: isCreatingTicket }] = useCreateTicketMutation();
+  const [sendMessageMutation] = useSendMessageMutation();
+
+  const getCleanSubject = (rawSubject?: string) => {
+    if (!rawSubject) return 'Support Enquiry';
+    const match = rawSubject.match(/^\[(.*?)\]\s*(.*)$/);
+    return match ? match[2].trim() : rawSubject;
+  };
+
+  const isTicketForThisRestaurant = (c: SupportConversation) => {
+    if (c.category && c.category !== 'RESTAURANT') return false;
+
+    // Filter out mock dummy records
+    if (
+      c.id === 'ENQ-2093BD86' ||
+      c.id === 'ENQ-REST-HOTELMAYURA' ||
+      c.id === 'ENQ-REST-SPICE' ||
+      c.id === 'ENQ-REST-PMKM' ||
+      c.id === 'ENQ-903' ||
+      c.customerId === 'hotelmayura@restaurant.foodie.local' ||
+      c.customerId === 'pmkm@foodie.local' ||
+      c.customerId === 'r0ck@foodie.local'
+    ) {
+      return false;
+    }
+
+    // Explicitly tracked ticket IDs for this restaurant session/account
+    if (trackedTicketIds.includes(c.id)) {
+      return true;
+    }
+
+    // Match exact restaurantId
+    if (currentRestaurantId && c.restaurantId && String(c.restaurantId).trim() === String(currentRestaurantId).trim()) {
+      return true;
+    }
+
+    const currNameNorm = currentRestaurantName.trim().toLowerCase();
+    const isGenericName = !currNameNorm || currNameNorm === 'partner restaurant' || currNameNorm === 'restaurant partner';
+
+    if (!isGenericName) {
+      if (c.restaurantName && c.restaurantName.trim().toLowerCase() === currNameNorm) {
+        return true;
+      }
+
+      // Check if ticket subject was tagged with [currentRestaurantName]
+      const subjNorm = (c.subject || '').trim().toLowerCase();
+      if (subjNorm.startsWith(`[${currNameNorm}]`)) {
+        return true;
+      }
+
+      // Legacy Shivam Cafe: ENQ-869CA402 belongs ONLY to Shivam Cafe
+      if (c.id === 'ENQ-869CA402' && currNameNorm.includes('shivam')) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const thisRestaurantConversations = (conversations || []).filter(isTicketForThisRestaurant);
+
+  const openConversations = thisRestaurantConversations.filter(
+    (c) => c.status !== 'RESOLVED' && c.status !== 'CLOSED'
+  );
+  const resolvedConversations = thisRestaurantConversations.filter(
+    (c) => c.status === 'RESOLVED' || c.status === 'CLOSED'
+  );
+
+  const filteredConversations =
+    filterTab === 'OPEN'
+      ? openConversations
+      : filterTab === 'RESOLVED'
+        ? resolvedConversations
+        : thisRestaurantConversations;
+
+  const activeEnquiry = thisRestaurantConversations.find((c) => c.id === activeEnquiryId) || null;
+
+  const { data: messages, isLoading: isLoadingMessages } = useGetMessagesQuery(activeEnquiryId || '', {
+    skip: !visible || !activeEnquiryId,
+    pollingInterval: visible && Boolean(activeEnquiryId) ? 1500 : 0,
+  });
+
+  // Keep order id prefilled if provided
   useEffect(() => {
-    // Basic fallback scroll when active ticket mounts
-    if (activeEnquiry && scrollViewRef.current) {
+    if (activeOrderId) {
+      setNewOrderIdInput(activeOrderId);
+    }
+  }, [activeOrderId]);
+
+  // Scroll to bottom on messages update
+  useEffect(() => {
+    if (activeEnquiryId && scrollViewRef.current) {
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 300);
+      }, 150);
     }
-  }, [activeEnquiry?.id]);
+  }, [activeEnquiryId, messages?.length]);
 
+  // Handle keyboard on iOS/Android
   useEffect(() => {
     if (Platform.OS !== 'web') {
       const showSub = Keyboard.addListener('keyboardDidShow', () => {
@@ -91,138 +226,105 @@ export function RestaurantSupportModal({
     }
   }, []);
 
-  const handleCreateEnquiry = () => {
-    // Exact predefined chat layout
-    setLocalChatMessages([
-      {
-        id: `loc-ai-init`,
-        message: 'Hi! How can we help you today with your order or application?',
-        senderType: 'AI',
-        senderName: '🤖 Foodie Assistant',
-        createdAt: new Date().toISOString(),
-        actionButtons: [
-          { label: '💰 Settlement & Payouts', actionText: 'Where is my payout?' },
-          { label: '📦 Dispute Delivery / Order', actionText: 'Issue with an order or rider' },
-          { label: '⚙️ Account Settings', actionText: 'Need help with business details' },
-          { label: '📋 Menu Options', actionText: 'Help managing menu items' },
-        ]
-      }
-    ]);
-    setIsCreatingNew(true);
+  const handleSelectCategory = (cat: typeof QUICK_CATEGORIES[0]) => {
+    setNewCategoryKey(cat.key);
+    setNewSubject(cat.subject);
   };
 
-  const handleSendLocalReply = async (text: string) => {
-    if (!text.trim()) return;
-    setIsSending(true);
+  const handleStartNewEnquiry = async () => {
+    if (isCreatingTicket) return;
 
-    const newLocalMsgs = [
-      ...localChatMessages,
-      { id: `loc-${Date.now()}`, message: text.trim(), senderType: 'RESTAURANT', senderName: restaurantName, createdAt: new Date().toISOString() }
-    ];
-    setLocalChatMessages(newLocalMsgs);
-    setChatInput('');
-
-    setTimeout(() => {
-      // Evaluate smart reply to get action buttons
-      import('../supportAiEngine').then(({ evaluateSmartSupportReply }) => {
-        const aiResult = evaluateSmartSupportReply(text.trim());
-        setLocalChatMessages([
-          ...newLocalMsgs,
-          {
-            id: `loc-ai-${Date.now()}`,
-            message: aiResult.reply,
-            senderType: 'AI',
-            senderName: '🤖 Foodie Assistant',
-            createdAt: new Date().toISOString(),
-            actionButtons: aiResult.actionButtons
-          }
-        ]);
-        setIsSending(false);
-      });
-    }, 500);
-  };
-
-  const handleSendReply = async () => {
-    if (isCreatingNew) {
-      return handleSendLocalReply(chatInput.trim());
+    if (!newSubject.trim()) {
+      setToast({ message: 'Please provide a subject for your enquiry', variant: 'error' });
+      return;
     }
-
-    if (!chatInput.trim() || !activeEnquiry) return;
-    setIsSending(true);
-
-    const userText = chatInput.trim();
-    try {
-      await sendMessage({
-        conversationId: activeEnquiry.id,
-        message: userText,
-        senderType: 'RESTAURANT',
-        senderName: restaurantName,
-      }).unwrap();
-
-      const isLiveAgentMode = activeEnquiry.status === 'ASSIGNED' || activeEnquiry.status === 'AGENT_ACTIVE' || activeEnquiry.status === 'WAITING_FOR_AGENT';
-
-      if (!isLiveAgentMode) {
-        const aiText = generateSupportReply(userText);
-        await sendMessage({
-          conversationId: activeEnquiry.id,
-          message: aiText,
-          senderType: 'AI',
-          senderName: 'Foodie AI Support',
-        }).unwrap();
-      }
-    } catch (e) {
-      setToast({ message: 'Failed to send message', variant: 'error' });
-    }
-
-    setChatInput('');
-    setIsSending(false);
-  };
-
-  const [syncLegacyChat] = useSyncLegacyChatMutation();
-
-  const handleConnectWithAgent = async () => {
-    if (isCreatingNew) {
-      setIsSending(true);
-      try {
-        const firstCustMsg = localChatMessages.find((m) => m.senderType === 'RESTAURANT');
-        const subject = firstCustMsg ? firstCustMsg.message.substring(0, 30) + '...' : 'Live Agent Request';
-        const res = await syncLegacyChat({
-          category: 'RESTAURANT',
-          subject,
-          senderName: restaurantName,
-          action: 'connect_agent',
-          messages: localChatMessages.map(m => ({
-            sender: m.senderType === 'RESTAURANT' ? 'restaurant' : 'admin',
-            message: m.message
-          }))
-        }).unwrap();
-        setActiveEnquiryId(res.id);
-        setIsCreatingNew(false);
-      } catch (e) {
-        setToast({ message: 'Failed to connect to agent', variant: 'error' });
-      }
-      setIsSending(false);
+    if (!newMessageText.trim()) {
+      setToast({ message: 'Please describe your query in the message box', variant: 'error' });
       return;
     }
 
-    if (!activeEnquiry) return;
     try {
-      await escalateConv(activeEnquiry.id).unwrap();
-    } catch (e) { }
+      const res = await createTicketMutation({
+        subject: newSubject.trim(),
+        message: newMessageText.trim(),
+        orderId: newOrderIdInput.trim() || undefined,
+        restaurantName: currentRestaurantName,
+        restaurantId: currentRestaurantId || undefined,
+      }).unwrap();
+
+      setToast({ message: 'Support enquiry submitted successfully', variant: 'success' });
+      setIsCreatingNew(false);
+      setNewMessageText('');
+      if (res?.id) {
+        const newId = res.id;
+        setTrackedTicketIds((prev) => {
+          const updated = Array.from(new Set([...prev, newId]));
+          if (storageKey) {
+            setStoredTicketIds(storageKey, updated);
+          }
+          return updated;
+        });
+        setActiveEnquiryId(newId);
+      }
+      refetchConversations();
+    } catch (err: any) {
+      const errMsg = err?.data?.message || err?.message || 'Failed to create enquiry. Please check your network connection.';
+      setToast({ message: errMsg, variant: 'error' });
+    }
+  };
+
+  const handleSendMessage = async () => {
+    const textToSend = chatInput.trim();
+    if (!textToSend || !activeEnquiryId || isSending) return;
+
+    setIsSending(true);
+    setChatInput('');
+
+    try {
+      await sendMessageMutation({
+        conversationId: activeEnquiryId,
+        message: textToSend,
+        senderName: currentRestaurantName,
+        senderType: 'RESTAURANT',
+      }).unwrap();
+    } catch {
+      setToast({ message: 'Failed to deliver message', variant: 'error' });
+      setChatInput(textToSend);
+    } finally {
+      setIsSending(false);
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'RESOLVED':
+      case 'CLOSED':
+        return { bg: '#DCFCE7', text: '#15803D', dot: '#16A34A', label: 'Resolved' };
+      case 'IN_PROGRESS':
+      case 'AGENT_ACTIVE':
+      case 'ASSIGNED':
+      case 'WAITING_FOR_AGENT':
+        return { bg: '#EFF6FF', text: '#1D4ED8', dot: '#3B82F6', label: 'In Progress' };
+      case 'OPEN':
+      default:
+        return { bg: '#FEF3C7', text: '#92400E', dot: '#F59E0B', label: 'Open' };
+    }
   };
 
   return (
     <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={{ flex: 1, backgroundColor: '#F8FAFC' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Header */}
+        {/* PREMIUM FOODIE GREEN HEADER */}
         <View
           style={{
             backgroundColor: '#14532D',
-            paddingTop: Platform.OS === 'ios' ? 50 : 20,
+            paddingTop: Platform.OS === 'ios' ? 52 : 24,
             paddingBottom: 16,
             paddingHorizontal: 20,
             flexDirection: 'row',
@@ -232,32 +334,81 @@ export function RestaurantSupportModal({
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.15,
-            shadowRadius: 4,
+            shadowRadius: 5,
           }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
             {activeEnquiry || isCreatingNew ? (
               <Pressable
                 onPress={() => {
-                  setActiveEnquiryId(null);
-                  setIsCreatingNew(false);
-                  setLocalChatMessages([]);
+                  if (isCreatingNew) {
+                    setIsCreatingNew(false);
+                  } else {
+                    setActiveEnquiryId(null);
+                  }
                 }}
-                style={{ padding: 4, marginRight: 12 }}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: 12,
+                }}
               >
-                <Feather name="arrow-left" size={24} color="#FFFFFF" />
+                <Feather name="arrow-left" size={20} color="#FFFFFF" />
               </Pressable>
             ) : null}
-            <View>
-              <Text style={{ fontSize: 18, fontWeight: '800', color: '#FFFFFF' }}>
+
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: '#FFFFFF' }} numberOfLines={1}>
+                  {activeEnquiry
+                    ? activeEnquiry.id
+                    : isCreatingNew
+                      ? 'New Support Enquiry'
+                      : 'Foodie Support Desk'}
+                </Text>
+                {activeEnquiry && (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: 8,
+                      paddingVertical: 2,
+                      borderRadius: 12,
+                      backgroundColor: getStatusColor(activeEnquiry.status).bg,
+                      gap: 4,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: 3,
+                        backgroundColor: getStatusColor(activeEnquiry.status).dot,
+                      }}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        fontWeight: '800',
+                        color: getStatusColor(activeEnquiry.status).text,
+                      }}
+                    >
+                      {getStatusColor(activeEnquiry.status).label}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              <Text style={{ fontSize: 12, color: '#A7F3D0', fontWeight: '500', marginTop: 2 }} numberOfLines={1}>
                 {activeEnquiry
-                  ? `Chat: ${activeEnquiry.id}`
-                  : 'Foodie Support Desk'}
-              </Text>
-              <Text style={{ fontSize: 12, color: '#A7F3D0', fontWeight: '500' }}>
-                {activeEnquiry
-                  ? activeEnquiry.subject
-                  : '🟢 Online • 2-Way Desk'}
+                  ? `${currentRestaurantName} • ${getCleanSubject(activeEnquiry.subject)}`
+                  : isCreatingNew
+                    ? `Authenticated as ${currentRestaurantName}`
+                    : `🍽️ ${currentRestaurantName} • Direct Admin Connection`}
               </Text>
             </View>
           </View>
@@ -265,22 +416,23 @@ export function RestaurantSupportModal({
           <Pressable
             onPress={onClose}
             style={{
-              width: 32,
-              height: 32,
-              borderRadius: 16,
-              backgroundColor: 'rgba(255,255,255,0.2)',
+              width: 34,
+              height: 34,
+              borderRadius: 17,
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
               justifyContent: 'center',
               alignItems: 'center',
+              marginLeft: 10,
             }}
           >
-            <Feather name="x" size={20} color="#FFFFFF" />
+            <Feather name="x" size={18} color="#FFFFFF" />
           </Pressable>
         </View>
 
-        {/* BODY 1: Active Live 2-Way Chat View */}
+        {/* VIEW 1: ACTIVE LIVE 2-WAY CHAT */}
         {activeEnquiry ? (
           <View style={{ flex: 1, backgroundColor: '#F1F5F9' }}>
-            {/* Enquiry Details Card */}
+            {/* ENQUIRY CONTEXT CARD */}
             <View
               style={{
                 backgroundColor: '#FFFFFF',
@@ -288,74 +440,170 @@ export function RestaurantSupportModal({
                 paddingVertical: 12,
                 borderBottomWidth: 1,
                 borderBottomColor: '#E2E8F0',
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
               }}
             >
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B' }}>{activeEnquiry.subject}</Text>
-                {activeEnquiry.orderId ? (
-                  <Text style={{ fontSize: 12, color: '#047857', fontWeight: '600', marginTop: 2 }}>
-                    Order Ref: #{activeEnquiry.orderId}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>
+                    {getCleanSubject(activeEnquiry.subject)}
                   </Text>
-                ) : null}
-              </View>
-              <View
-                style={{
-                  paddingHorizontal: 10,
-                  paddingVertical: 4,
-                  borderRadius: 12,
-                  backgroundColor:
-                    activeEnquiry.status === 'RESOLVED'
-                      ? '#DEF7EC'
-                      : (activeEnquiry.status === 'WAITING_FOR_AGENT' || activeEnquiry.status === 'ASSIGNED')
-                        ? '#FEF3C7'
-                        : '#E0E7FF',
-                }}
-              >
-                <Text
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                    <Text style={{ fontSize: 11, color: '#64748B' }}>
+                      Created: {new Date(activeEnquiry.createdAt).toLocaleDateString()}
+                    </Text>
+                    {activeEnquiry.orderId ? (
+                      <Text style={{ fontSize: 11, color: '#16A34A', fontWeight: '700' }}>
+                        Order Ref: #{activeEnquiry.orderId}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+
+                <View
                   style={{
-                    fontSize: 11,
-                    fontWeight: '800',
-                    color:
-                      activeEnquiry.status === 'RESOLVED'
-                        ? '#03543F'
-                        : (activeEnquiry.status === 'WAITING_FOR_AGENT' || activeEnquiry.status === 'ASSIGNED')
-                          ? '#92400E'
-                          : '#3730A3',
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: 10,
+                    backgroundColor: getStatusColor(activeEnquiry.status).bg,
                   }}
                 >
-                  {activeEnquiry.status.replace(/_/g, ' ')}
-                </Text>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: '800',
+                      color: getStatusColor(activeEnquiry.status).text,
+                    }}
+                  >
+                    {getStatusColor(activeEnquiry.status).label}
+                  </Text>
+                </View>
               </View>
+
+              {/* Status Note Banner */}
+              {activeEnquiry.status === 'RESOLVED' || activeEnquiry.status === 'CLOSED' ? (
+                <View
+                  style={{
+                    backgroundColor: '#F0FDF4',
+                    borderWidth: 1,
+                    borderColor: '#BBF7D0',
+                    borderRadius: 12,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    marginTop: 8,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 10,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                    <Feather name="check-circle" size={16} color="#16A34A" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, color: '#15803D', fontWeight: '700' }}>
+                        Enquiry resolved by Admin Support
+                      </Text>
+                      <Text style={{ fontSize: 11, color: '#166534', marginTop: 2 }}>
+                        Need further help? Start a new chat or reply to reopen.
+                      </Text>
+                    </View>
+                  </View>
+                  <Pressable
+                    onPress={() => {
+                      setActiveEnquiryId(null);
+                      setIsCreatingNew(true);
+                    }}
+                    style={{
+                      backgroundColor: '#15803D',
+                      paddingHorizontal: 12,
+                      paddingVertical: 7,
+                      borderRadius: 10,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    <Feather name="plus" size={14} color="#FFFFFF" />
+                    <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>
+                      New Chat
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : activeEnquiry.status === 'IN_PROGRESS' || activeEnquiry.status === 'AGENT_ACTIVE' ? (
+                <View
+                  style={{
+                    backgroundColor: '#EFF6FF',
+                    borderWidth: 1,
+                    borderColor: '#BFDBFE',
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    marginTop: 8,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <Feather name="shield" size={14} color="#2563EB" />
+                  <Text style={{ fontSize: 11, color: '#1E40AF', fontWeight: '600', flex: 1 }}>
+                    A human Admin Support Agent is actively reviewing your enquiry.
+                  </Text>
+                </View>
+              ) : null}
             </View>
 
+            {/* CONVERSATION MESSAGE SCROLLER */}
             <ScrollView
               ref={scrollViewRef}
-              onContentSizeChange={() => {
-                scrollViewRef.current?.scrollToEnd({ animated: true });
-              }}
-              contentContainerStyle={{ padding: 16, gap: 12 }}
               style={{ flex: 1 }}
+              contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 24 }}
             >
-              {/* Render messages */}
-              {(messages || []).map((msg: any) => {
-                const isAdmin = msg.senderType === 'AGENT' || msg.senderType === 'AI' || msg.senderType === 'SYSTEM';
+              {isLoadingMessages && !messages ? (
+                <View style={{ padding: 32, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color="#16A34A" />
+                  <Text style={{ fontSize: 12, color: '#64748B', marginTop: 8 }}>Loading conversation...</Text>
+                </View>
+              ) : null}
+
+              {messages && messages.length === 0 ? (
+                <View
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 14,
+                    padding: 24,
+                    alignItems: 'center',
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                  }}
+                >
+                  <Feather name="message-square" size={32} color="#94A3B8" />
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#334155', marginTop: 8 }}>
+                    Conversation opened
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 4 }}>
+                    Type your message below. A Foodie Admin Support Agent will respond shortly.
+                  </Text>
+                </View>
+              ) : null}
+
+              {(messages || []).map((msg: SupportMessage) => {
+                const isRestaurant = msg.senderType === 'RESTAURANT';
+                const isAdmin = msg.senderType === 'AGENT' || msg.senderType === 'ADMIN';
+
                 return (
                   <View
                     key={msg.id}
                     style={{
-                      alignSelf: isAdmin ? 'flex-start' : 'flex-end',
-                      maxWidth: '85%',
+                      alignSelf: isRestaurant ? 'flex-end' : 'flex-start',
+                      maxWidth: '84%',
                     }}
                   >
+                    {/* SENDER LABEL & TIMESTAMP */}
                     <View
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',
                         marginBottom: 4,
-                        alignSelf: isAdmin ? 'flex-start' : 'flex-end',
+                        alignSelf: isRestaurant ? 'flex-end' : 'flex-start',
                         gap: 6,
                       }}
                     >
@@ -365,7 +613,7 @@ export function RestaurantSupportModal({
                             width: 18,
                             height: 18,
                             borderRadius: 9,
-                            backgroundColor: '#14532D',
+                            backgroundColor: '#16A34A',
                             justifyContent: 'center',
                             alignItems: 'center',
                           }}
@@ -373,34 +621,47 @@ export function RestaurantSupportModal({
                           <Feather name="shield" size={10} color="#FFFFFF" />
                         </View>
                       ) : null}
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: isAdmin ? '#14532D' : '#64748B' }}>
-                        {msg.senderName || 'Agent'}
+
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: '700',
+                          color: isRestaurant ? '#16A34A' : '#1E293B',
+                        }}
+                      >
+                        {isRestaurant ? 'You' : (msg.senderName || 'Admin Support')}
                       </Text>
-                      <Text style={{ fontSize: 10, color: '#94A3B8' }}>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+
+                      <Text style={{ fontSize: 10, color: '#94A3B8' }}>
+                        {msg.createdAt
+                          ? new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                          : 'Just now'}
+                      </Text>
                     </View>
 
+                    {/* BUBBLE */}
                     <View
                       style={{
-                        backgroundColor: isAdmin ? '#FFFFFF' : '#14532D',
-                        paddingHorizontal: 14,
-                        paddingVertical: 10,
-                        borderRadius: 16,
-                        borderTopLeftRadius: isAdmin ? 4 : 16,
-                        borderTopRightRadius: isAdmin ? 16 : 4,
-                        borderWidth: isAdmin ? 1 : 0,
+                        backgroundColor: isRestaurant ? '#15803D' : '#FFFFFF',
+                        paddingHorizontal: 16,
+                        paddingVertical: 12,
+                        borderRadius: 18,
+                        borderBottomRightRadius: isRestaurant ? 4 : 18,
+                        borderBottomLeftRadius: isRestaurant ? 18 : 4,
+                        borderWidth: isRestaurant ? 0 : 1,
                         borderColor: '#E2E8F0',
                         shadowColor: '#000',
                         shadowOffset: { width: 0, height: 1 },
                         shadowOpacity: 0.05,
-                        shadowRadius: 2,
+                        shadowRadius: 3,
                         elevation: 1,
                       }}
                     >
                       <Text
                         style={{
                           fontSize: 14,
-                          color: isAdmin ? '#1E293B' : '#FFFFFF',
                           lineHeight: 20,
+                          color: isRestaurant ? '#FFFFFF' : '#0F172A',
                         }}
                       >
                         {msg.content}
@@ -409,46 +670,19 @@ export function RestaurantSupportModal({
                   </View>
                 );
               })}
-
-              {/* Dynamic Live Agent Connect Button */}
-              {activeEnquiry.status === 'AI_ACTIVE' && (
-                <Pressable
-                  onPress={handleConnectWithAgent}
-                  style={{
-                    alignSelf: 'stretch',
-                    backgroundColor: '#F3E8FF',
-                    paddingVertical: 12,
-                    paddingHorizontal: 16,
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: '#D8B4FE',
-                    marginTop: 8,
-                    marginBottom: 16,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                  }}
-                >
-                  <Feather name="headphones" size={18} color="#9333EA" />
-                  <Text style={{ color: '#9333EA', fontWeight: '800', fontSize: 13 }}>
-                    Connect to Live Support Agent
-                  </Text>
-                </Pressable>
-              )}
             </ScrollView>
 
-            {/* Reply Input Bar */}
+            {/* MESSAGE COMPOSER BAR */}
             <View
               style={{
                 backgroundColor: '#FFFFFF',
-                paddingHorizontal: 12,
+                paddingHorizontal: 14,
                 paddingVertical: 10,
                 borderTopWidth: 1,
                 borderTopColor: '#E2E8F0',
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: 8,
+                gap: 10,
               }}
             >
               <RNTextInput
@@ -457,12 +691,12 @@ export function RestaurantSupportModal({
                   backgroundColor: '#F8FAFC',
                   borderWidth: 1,
                   borderColor: '#CBD5E1',
-                  borderRadius: 20,
+                  borderRadius: 22,
                   paddingHorizontal: 16,
                   paddingVertical: Platform.OS === 'ios' ? 10 : 8,
                   fontSize: 14,
                   color: '#0F172A',
-                  maxHeight: 100,
+                  maxHeight: 110,
                 }}
                 placeholder="Type your message to support..."
                 placeholderTextColor="#94A3B8"
@@ -470,16 +704,18 @@ export function RestaurantSupportModal({
                 onChangeText={setChatInput}
                 multiline
               />
+
               <Pressable
-                onPress={handleSendReply}
+                onPress={handleSendMessage}
                 disabled={isSending || !chatInput.trim()}
                 style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 21,
-                  backgroundColor: chatInput.trim() ? '#14532D' : '#94A3B8',
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: chatInput.trim() ? '#15803D' : '#CBD5E1',
                   justifyContent: 'center',
                   alignItems: 'center',
+                  elevation: chatInput.trim() ? 2 : 0,
                 }}
               >
                 {isSending ? (
@@ -491,237 +727,366 @@ export function RestaurantSupportModal({
             </View>
           </View>
         ) : isCreatingNew ? (
-          /* BODY 2: Local AI Chatbot Form (Replacing Old Form) */
-          <View style={{ flex: 1, backgroundColor: '#F1F5F9' }}>
+          /* VIEW 2: NEW ENQUIRY FORM */
+          <ScrollView
+            style={{ flex: 1, backgroundColor: '#F8FAFC' }}
+            contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+          >
+            {/* HERO PROMPT */}
             <View
               style={{
                 backgroundColor: '#FFFFFF',
-                paddingHorizontal: 16,
-                paddingVertical: 12,
-                borderBottomWidth: 1,
-                borderBottomColor: '#E2E8F0',
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
+                borderRadius: 20,
+                padding: 20,
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.05,
+                shadowRadius: 6,
+                elevation: 2,
+                marginBottom: 20,
               }}
             >
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B' }}>Select a predefined query or type below</Text>
-              </View>
-              <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: '#E0E7FF' }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: '#3730A3' }}>AI ACTIVE</Text>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: '#0F172A', marginBottom: 4 }}>
+                How can Admin Support assist you? 👋
+              </Text>
+              <Text style={{ fontSize: 13, color: '#64748B', lineHeight: 18, marginBottom: 16 }}>
+                Select a topic below and provide details. Your enquiry will be immediately routed to the Restaurant Admin Support Desk.
+              </Text>
+
+              <Text style={{ fontSize: 12, fontWeight: '800', color: '#16A34A', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>
+                SELECT TOPIC
+              </Text>
+
+              <View style={{ gap: 8 }}>
+                {QUICK_CATEGORIES.map((cat) => {
+                  const isSelected = newCategoryKey === cat.key;
+                  return (
+                    <Pressable
+                      key={cat.key}
+                      onPress={() => handleSelectCategory(cat)}
+                      style={{
+                        paddingVertical: 12,
+                        paddingHorizontal: 16,
+                        borderRadius: 12,
+                        backgroundColor: isSelected ? '#F0FDF4' : '#FFFFFF',
+                        borderWidth: 1.5,
+                        borderColor: isSelected ? '#16A34A' : '#E2E8F0',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontWeight: isSelected ? '800' : '600',
+                          color: isSelected ? '#15803D' : '#334155',
+                        }}
+                      >
+                        {cat.label}
+                      </Text>
+                      {isSelected ? <Feather name="check-circle" size={16} color="#16A34A" /> : null}
+                    </Pressable>
+                  );
+                })}
               </View>
             </View>
 
-            <ScrollView
-              ref={scrollViewRef}
-              onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-              contentContainerStyle={{ padding: 16, gap: 12 }}
-              style={{ flex: 1 }}
+            {/* SUBJECT & DETAILS */}
+            <View
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: 20,
+                padding: 20,
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+                gap: 16,
+              }}
             >
-              {/* Quick Help Card at the top */}
-              <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, marginBottom: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2, borderWidth: 1, borderColor: '#F1F5F9' }}>
-                <Text style={{ fontSize: 18, fontWeight: '800', color: '#1E293B', marginBottom: 8 }}>Hi! Welcome to Foodie Support 👋</Text>
-                <Text style={{ fontSize: 13, color: '#475569', marginBottom: 20 }}>
-                  Recent Order: {activeOrderId ? <><Text style={{ color: '#16A34A', fontWeight: '800' }}>#{activeOrderId}</Text> • Preparing for Delivery 🚴</> : <Text style={{ color: '#64748B' }}>No active orders</Text>}
+              <View>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155', marginBottom: 6 }}>
+                  SUBJECT
                 </Text>
-
-                <Text style={{ fontSize: 13, fontWeight: '800', color: '#334155', letterSpacing: 0.5, marginBottom: 12 }}>QUICK HELP OPTIONS</Text>
-
-                {[
-                  { icon: '💰', text: 'Where is my payout?' },
-                  { icon: '📦', text: 'Issue with an order or rider' },
-                  { icon: '⚙️', text: 'Need help with business details' },
-                  { icon: '📋', text: 'Help managing menu items' }
-                ].map((opt, i) => (
-                  <Pressable key={i} onPress={() => handleSendLocalReply(opt.text)} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 16, backgroundColor: pressed ? '#F8FAFC' : '#FFFFFF', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 12 })}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                      <Text style={{ fontSize: 18 }}>{opt.icon}</Text>
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: '#1E293B' }}>{opt.text}</Text>
-                    </View>
-                    <Feather name="chevron-right" size={16} color="#047857" />
-                  </Pressable>
-                ))}
+                <RNTextInput
+                  style={{
+                    backgroundColor: '#F8FAFC',
+                    borderWidth: 1,
+                    borderColor: '#CBD5E1',
+                    borderRadius: 12,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    fontSize: 14,
+                    color: '#0F172A',
+                  }}
+                  value={newSubject}
+                  onChangeText={setNewSubject}
+                  placeholder="Enter subject..."
+                  placeholderTextColor="#94A3B8"
+                />
               </View>
 
-              {localChatMessages.map((msg: any) => {
-                const isAdmin = msg.senderType === 'AI';
-                return (
-                  <View key={msg.id} style={{ alignSelf: isAdmin ? 'flex-start' : 'flex-end', maxWidth: '85%' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4, alignSelf: isAdmin ? 'flex-start' : 'flex-end', gap: 8 }}>
-                      {isAdmin ? (
-                        <>
-                          <View style={{ backgroundColor: '#0284C7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-                            <Text style={{ fontSize: 11, fontWeight: '800', color: '#FFFFFF' }}>{msg.senderName}</Text>
-                          </View>
-                          <Text style={{ fontSize: 10, color: '#94A3B8' }}>
-                            {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </Text>
-                        </>
-                      ) : (
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B' }}>
-                          {msg.senderName}
-                        </Text>
-                      )}
-                    </View>
-                    <View style={{ backgroundColor: isAdmin ? '#F8FAFC' : '#14532D', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 16, borderTopLeftRadius: isAdmin ? 4 : 16, borderTopRightRadius: isAdmin ? 16 : 4, borderWidth: isAdmin ? 1 : 0, borderColor: '#E2E8F0' }}>
-                      <Text style={{ fontSize: 14, color: isAdmin ? '#1E293B' : '#FFFFFF', lineHeight: 20 }}>
-                        {msg.message}
-                      </Text>
-                    </View>
-
-                    {/* Render action pills directly under the AI response */}
-                    {isAdmin && msg.actionButtons && msg.actionButtons.length > 0 && (
-                      <View style={{ gap: 10, marginTop: 12 }}>
-                        {msg.actionButtons.map((btn: any, i: number) => (
-                          <Pressable
-                            key={i}
-                            onPress={() => handleSendLocalReply(btn.actionText)}
-                            style={({ pressed }) => ({
-                              backgroundColor: pressed ? '#F8FAFC' : '#FFFFFF',
-                              paddingVertical: 12,
-                              paddingHorizontal: 16,
-                              borderRadius: 24,
-                              borderWidth: 1.5,
-                              borderColor: '#14532D',
-                              alignSelf: 'flex-start',
-                            })}
-                          >
-                            <Text style={{ fontSize: 14, color: '#14532D', fontWeight: '800' }}>{btn.label}</Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
-
-              {localChatMessages.length > 0 && (
-                <Pressable
-                  onPress={handleConnectWithAgent}
+              <View>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155', marginBottom: 6 }}>
+                  ORDER REF # (OPTIONAL)
+                </Text>
+                <RNTextInput
                   style={{
-                    alignSelf: 'stretch',
-                    backgroundColor: '#FFFBEB',
-                    paddingVertical: 12,
-                    paddingHorizontal: 16,
-                    borderRadius: 12,
+                    backgroundColor: '#F8FAFC',
                     borderWidth: 1,
-                    borderColor: '#FDE68A',
-                    marginTop: 8,
-                    marginBottom: 16,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
+                    borderColor: '#CBD5E1',
+                    borderRadius: 12,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    fontSize: 14,
+                    color: '#0F172A',
                   }}
-                >
-                  <Feather name="headphones" size={18} color="#D97706" />
-                  <Text style={{ color: '#D97706', fontWeight: '800', fontSize: 13 }}>
-                    Connect to Live Support Agent
-                  </Text>
-                </Pressable>
-              )}
-            </ScrollView>
+                  value={newOrderIdInput}
+                  onChangeText={setNewOrderIdInput}
+                  placeholder="e.g. 1042 or leave blank"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
 
-            {/* Reply Input Bar for Local Chat */}
-            <View style={{ backgroundColor: '#FFFFFF', paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#E2E8F0', flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <RNTextInput
-                style={{ flex: 1, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 20, paddingHorizontal: 16, paddingVertical: Platform.OS === 'ios' ? 10 : 8, fontSize: 14, color: '#0F172A', maxHeight: 100 }}
-                placeholder="Type your query..."
-                placeholderTextColor="#94A3B8"
-                value={chatInput}
-                onChangeText={setChatInput}
-                multiline
-              />
+              <View>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155', marginBottom: 6 }}>
+                  MESSAGE DETAILS *
+                </Text>
+                <RNTextInput
+                  style={{
+                    backgroundColor: '#F8FAFC',
+                    borderWidth: 1,
+                    borderColor: '#CBD5E1',
+                    borderRadius: 12,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    fontSize: 14,
+                    color: '#0F172A',
+                    minHeight: 100,
+                    textAlignVertical: 'top',
+                  }}
+                  value={newMessageText}
+                  onChangeText={setNewMessageText}
+                  placeholder="Describe your issue or question in detail..."
+                  placeholderTextColor="#94A3B8"
+                  multiline
+                />
+              </View>
+
               <Pressable
-                onPress={() => handleSendLocalReply(chatInput)}
-                disabled={isSending || !chatInput.trim()}
-                style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: chatInput.trim() ? '#14532D' : '#94A3B8', justifyContent: 'center', alignItems: 'center' }}
+                onPress={handleStartNewEnquiry}
+                disabled={isCreatingTicket || !newMessageText.trim()}
+                style={{
+                  backgroundColor: newMessageText.trim() ? '#15803D' : '#94A3B8',
+                  borderRadius: 14,
+                  paddingVertical: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'row',
+                  gap: 8,
+                  marginTop: 8,
+                  shadowColor: '#15803D',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: newMessageText.trim() ? 0.2 : 0,
+                  shadowRadius: 6,
+                  elevation: 2,
+                }}
               >
-                {isSending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Feather name="send" size={18} color="#FFFFFF" style={{ marginLeft: 2 }} />}
+                {isCreatingTicket ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Feather name="send" size={16} color="#FFFFFF" />
+                    <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '800' }}>
+                      Submit Support Enquiry
+                    </Text>
+                  </>
+                )}
               </Pressable>
             </View>
-          </View>
+          </ScrollView>
         ) : (
-          /* BODY 3: List of Enquiries & New Enquiry Launcher */
-          <ScrollView contentContainerStyle={{ padding: 20 }}>
-            {/* Create New Button Header */}
+          /* VIEW 3: RESTAURANT SUPPORT HOME & ENQUIRIES LIST */
+          <ScrollView
+            style={{ flex: 1, backgroundColor: '#F8FAFC' }}
+            contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+          >
+            {/* NEW ENQUIRY HERO LAUNCHER */}
             <Pressable
               onPress={() => setIsCreatingNew(true)}
-              style={{
+              style={({ pressed }) => ({
                 backgroundColor: '#14532D',
-                borderRadius: 16,
-                paddingHorizontal: 20,
-                paddingVertical: 16,
+                borderRadius: 20,
+                padding: 20,
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                marginBottom: 24,
+                marginBottom: 20,
                 shadowColor: '#14532D',
                 shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.15,
+                shadowOpacity: pressed ? 0.1 : 0.2,
                 shadowRadius: 8,
-                elevation: 3,
-              }}
+                elevation: 4,
+              })}
             >
               <View style={{ flex: 1, marginRight: 12 }}>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: '#FFFFFF' }}>Have a question or issue?</Text>
-                <Text style={{ fontSize: 13, color: '#A7F3D0', marginTop: 2 }}>
-                  Start a live chat enquiry with Admin Support
+                <Text style={{ fontSize: 17, fontWeight: '800', color: '#FFFFFF' }}>
+                  Have a question or issue?
+                </Text>
+                <Text style={{ fontSize: 13, color: '#A7F3D0', marginTop: 4, lineHeight: 18 }}>
+                  Start a direct two-way chat with the Foodie Restaurant Admin team.
                 </Text>
               </View>
+
               <View
                 style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  backgroundColor: '#FCD34D',
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: '#22C55E',
                   justifyContent: 'center',
                   alignItems: 'center',
                 }}
               >
-                <Feather name="plus" size={22} color="#14532D" />
+                <Feather name="plus" size={24} color="#FFFFFF" />
               </View>
             </Pressable>
 
-            <Text
-              style={{
-                fontSize: 13,
-                textTransform: 'uppercase',
-                color: '#14532D',
-                fontWeight: '800',
-                letterSpacing: 0.8,
-                marginBottom: 12,
-              }}
-            >
-              Your Active Enquiries & Live Chats ({(activeConversations || []).length})
-            </Text>
+            {/* FILTER TABS */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              {(['OPEN', 'RESOLVED', 'ALL'] as const).map((tab) => {
+                const isSelected = filterTab === tab;
+                const count =
+                  tab === 'OPEN'
+                    ? openConversations.length
+                    : tab === 'RESOLVED'
+                      ? resolvedConversations.length
+                      : thisRestaurantConversations.length;
 
-            {!(activeConversations && activeConversations.length > 0) ? (
+                return (
+                  <Pressable
+                    key={tab}
+                    onPress={() => setFilterTab(tab)}
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 7,
+                      borderRadius: 16,
+                      backgroundColor: isSelected ? '#15803D' : '#FFFFFF',
+                      borderWidth: 1,
+                      borderColor: isSelected ? '#15803D' : '#E2E8F0',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: '700',
+                        color: isSelected ? '#FFFFFF' : '#475569',
+                      }}
+                    >
+                      {tab === 'OPEN' ? 'Active Chats' : tab === 'RESOLVED' ? 'Resolved' : 'All Enquiries'}
+                    </Text>
+                    <View
+                      style={{
+                        paddingHorizontal: 6,
+                        paddingVertical: 1,
+                        borderRadius: 10,
+                        backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.25)' : '#F1F5F9',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: '800',
+                          color: isSelected ? '#FFFFFF' : '#475569',
+                        }}
+                      >
+                        {count}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* ENQUIRIES LIST */}
+            {isLoadingConversations && !conversations ? (
+              <View style={{ padding: 40, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color="#16A34A" />
+                <Text style={{ fontSize: 13, color: '#64748B', marginTop: 10 }}>Loading your enquiries...</Text>
+              </View>
+            ) : filteredConversations.length === 0 ? (
               <View
                 style={{
                   backgroundColor: '#FFFFFF',
-                  borderRadius: 16,
-                  padding: 32,
+                  borderRadius: 20,
+                  padding: 36,
                   alignItems: 'center',
                   borderWidth: 1,
                   borderColor: '#E2E8F0',
                 }}
               >
-                <Feather name="message-square" size={40} color="#94A3B8" style={{ marginBottom: 12 }} />
-                <Text style={{ fontSize: 16, fontWeight: '700', color: '#334155' }}>No support enquiries yet</Text>
-                <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center', marginTop: 4 }}>
-                  Click "Start a live chat enquiry" above to connect with Foodie Admin Support.
+                <View
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 28,
+                    backgroundColor: '#F0FDF4',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginBottom: 14,
+                  }}
+                >
+                  <Feather name="message-square" size={26} color="#16A34A" />
+                </View>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>
+                  {filterTab === 'OPEN'
+                    ? 'No Active Chats'
+                    : filterTab === 'RESOLVED'
+                      ? 'No Resolved Enquiries'
+                      : 'No Support Enquiries Yet'}
                 </Text>
+                <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center', marginTop: 6, lineHeight: 18, maxWidth: 280 }}>
+                  {filterTab === 'OPEN'
+                    ? 'You have no open enquiries. Need help with payouts, menu, or orders? Start a new chat with Foodie Admin.'
+                    : filterTab === 'RESOLVED'
+                      ? 'No resolved enquiries for this restaurant yet.'
+                      : 'You have not submitted any enquiries yet. Tap the button below to start your direct conversation.'}
+                </Text>
+
+                <Pressable
+                  onPress={() => setIsCreatingNew(true)}
+                  style={{
+                    backgroundColor: '#15803D',
+                    borderRadius: 12,
+                    paddingHorizontal: 20,
+                    paddingVertical: 11,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                    marginTop: 18,
+                  }}
+                >
+                  <Feather name="plus" size={16} color="#FFFFFF" />
+                  <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '800' }}>
+                    Start New Conversation
+                  </Text>
+                </Pressable>
               </View>
             ) : (
               <View style={{ gap: 12 }}>
-                {(activeConversations || []).map((item) => {
-                  const hasAdminReply = item.messages?.some((m) => m.senderType === 'AGENT') || Boolean(item.lastMessageAt);
+                {filteredConversations.map((item: SupportConversation) => {
+                  const statusInfo = getStatusColor(item.status);
                   const lastMessageItem = item.messages && item.messages.length > 0
                     ? item.messages[item.messages.length - 1]
                     : null;
-                  const lastMessage = lastMessageItem ? lastMessageItem.content : item.subject;
+                  const lastMessageText = lastMessageItem?.content || item.subject;
+                  const hasAdminReply = (item.messages || []).some(
+                    (m) => m.senderType === 'AGENT' || m.senderType === 'ADMIN'
+                  ) || Boolean(item.lastMessageAt);
 
                   return (
                     <Pressable
@@ -729,20 +1094,23 @@ export function RestaurantSupportModal({
                       onPress={() => setActiveEnquiryId(item.id)}
                       style={({ pressed }) => ({
                         backgroundColor: pressed ? '#F8FAFC' : '#FFFFFF',
-                        borderRadius: 16,
+                        borderRadius: 18,
                         padding: 16,
                         borderWidth: 1,
                         borderColor: hasAdminReply ? '#86EFAC' : '#E2E8F0',
                         shadowColor: '#000',
                         shadowOffset: { width: 0, height: 2 },
                         shadowOpacity: 0.04,
-                        shadowRadius: 4,
+                        shadowRadius: 5,
                         elevation: 2,
                       })}
                     >
+                      {/* Top Meta Row */}
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <Text style={{ fontSize: 13, fontWeight: '800', color: '#14532D' }}>{item.id}</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '800', color: '#14532D' }}>
+                            {item.id}
+                          </Text>
                           {hasAdminReply ? (
                             <View
                               style={{
@@ -756,24 +1124,32 @@ export function RestaurantSupportModal({
                               }}
                             >
                               <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#16A34A' }} />
-                              <Text style={{ fontSize: 11, fontWeight: '800', color: '#15803D' }}>Admin Replied</Text>
+                              <Text style={{ fontSize: 10, fontWeight: '800', color: '#15803D' }}>
+                                Admin Replied
+                              </Text>
                             </View>
                           ) : null}
                         </View>
-                        <Text style={{ fontSize: 11, color: '#94A3B8' }}>{new Date(item.updatedAt).toLocaleDateString()}</Text>
+
+                        <Text style={{ fontSize: 11, color: '#94A3B8' }}>
+                          {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : 'Recent'}
+                        </Text>
                       </View>
 
-                      <Text style={{ fontSize: 15, fontWeight: '700', color: '#0F172A', marginTop: 8 }}>
-                        {item.subject}
+                      {/* Subject */}
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginTop: 8 }}>
+                        {getCleanSubject(item.subject)}
                       </Text>
 
+                      {/* Message Preview */}
                       <Text
                         numberOfLines={2}
                         style={{ fontSize: 13, color: '#64748B', marginTop: 4, lineHeight: 18 }}
                       >
-                        {lastMessage}
+                        {getCleanSubject(lastMessageText)}
                       </Text>
 
+                      {/* Bottom Footer Row */}
                       <View
                         style={{
                           flexDirection: 'row',
@@ -785,35 +1161,20 @@ export function RestaurantSupportModal({
                           borderTopColor: '#F1F5F9',
                         }}
                       >
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#047857' }}>
-                          Tap to open two-way chat ›
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#16A34A' }}>
+                          Open live chat ›
                         </Text>
+
                         <View
                           style={{
                             paddingHorizontal: 8,
                             paddingVertical: 2,
                             borderRadius: 8,
-                            backgroundColor:
-                              item.status === 'RESOLVED'
-                                ? '#DEF7EC'
-                                : (item.status === 'WAITING_FOR_AGENT' || item.status === 'ASSIGNED')
-                                  ? '#FEF3C7'
-                                  : '#F3F4F6',
+                            backgroundColor: statusInfo.bg,
                           }}
                         >
-                          <Text
-                            style={{
-                              fontSize: 10,
-                              fontWeight: '800',
-                              color:
-                                item.status === 'RESOLVED'
-                                  ? '#03543F'
-                                  : (item.status === 'WAITING_FOR_AGENT' || item.status === 'ASSIGNED')
-                                    ? '#92400E'
-                                    : '#4B5563',
-                            }}
-                          >
-                            {item.status.replace(/_/g, ' ')}
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: statusInfo.text }}>
+                            {statusInfo.label}
                           </Text>
                         </View>
                       </View>

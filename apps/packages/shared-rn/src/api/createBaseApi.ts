@@ -129,11 +129,104 @@ export function createBaseApi<TagTypes extends string = string>(
     const requestArgs = attachIdempotencyHeader(args);
     const result = await rawBaseQuery(requestArgs, api, extraOptions ?? {});
 
+    const tryReauthAndRetry = async (
+      failedCode: string,
+      status: number | string,
+    ): Promise<
+      | { data: unknown; meta: FetchBaseQueryMeta | undefined }
+      | { error: EnvelopeAwareError; meta: FetchBaseQueryMeta | undefined }
+      | null
+    > => {
+      if (failedCode === 'TOKEN_REUSE_DETECTED') {
+        await config.onTokenReuseDetected();
+        return null;
+      }
+
+      const is401 = failedCode === 'UNAUTHORIZED' || status === 401;
+      const urlStr = extractUrl(requestArgs);
+
+      if (is401) {
+        if (isRefreshEndpoint(urlStr)) {
+          await config.onRefreshFailed?.('UNAUTHORIZED');
+          return null;
+        }
+
+        const refreshToken = config.getRefreshToken(api.getState());
+        if (!refreshToken) {
+          await config.onRefreshFailed?.('UNAUTHORIZED');
+          return null;
+        }
+
+        const pair = await performTokenRefresh({
+          baseUrl: config.baseUrl,
+          refreshToken,
+          callbacks: refreshCallbacks,
+        });
+
+        if (pair) {
+          const retryResult = await rawBaseQuery(
+            requestArgs,
+            api,
+            extraOptions ?? {},
+          );
+          if (retryResult.error) {
+            const retryError = retryResult.error as FetchBaseQueryError;
+            const errorMsg =
+              'error' in retryError && typeof retryError.error === 'string'
+                ? retryError.error
+                : 'check your connection';
+            return {
+              error: {
+                status: retryError.status,
+                data: {
+                  code: 'NETWORK_ERROR',
+                  message: `Network error: ${errorMsg}`,
+                  fields: null,
+                },
+              },
+              meta: retryResult.meta,
+            };
+          }
+          const retryEnvelope = parseEnvelopeFromUnknown(retryResult.data);
+          recordRequestId(retryEnvelope?.meta?.requestId);
+          if (retryEnvelope?.success) {
+            return { data: retryEnvelope.data, meta: retryResult.meta };
+          }
+          const retryCode = retryEnvelope?.error?.code ?? 'INTERNAL_ERROR';
+          return {
+            error: {
+              status: retryEnvelope?.meta ? 400 : 401,
+              data: {
+                code: retryCode,
+                message:
+                  retryEnvelope?.error?.message ?? 'Something went wrong',
+                fields: retryEnvelope?.error?.fields ?? null,
+                requestId: retryEnvelope?.meta?.requestId,
+              },
+            },
+            meta: retryResult.meta,
+          };
+        } else {
+          return null;
+        }
+      }
+
+      return null;
+    };
+
     if (result.error) {
       const fetchError = result.error as FetchBaseQueryError;
       const envelope = parseEnvelopeFromUnknown(fetchError.data);
+      const code =
+        envelope?.error?.code ??
+        (fetchError.status === 401 ? 'UNAUTHORIZED' : 'INTERNAL_ERROR');
+
+      const reauthResult = await tryReauthAndRetry(code, fetchError.status);
+      if (reauthResult) {
+        return reauthResult;
+      }
+
       if (envelope && envelope.error) {
-        const code = envelope.error.code ?? 'INTERNAL_ERROR';
         const apiError: EnvelopeAwareError = {
           status: fetchError.status,
           data: {
@@ -143,7 +236,11 @@ export function createBaseApi<TagTypes extends string = string>(
           },
         };
         const urlStr = extractUrl(requestArgs);
-        if (!(code === 'RESOURCE_NOT_FOUND' && urlStr.includes('/restaurants/me'))) {
+        if (
+          !(code === 'RESOURCE_NOT_FOUND' && urlStr.includes('/restaurants/me')) &&
+          code !== 'UNAUTHORIZED' &&
+          fetchError.status !== 401
+        ) {
           logger.error('API application error', {
             url: urlStr,
             status: String(fetchError.status),
@@ -153,19 +250,27 @@ export function createBaseApi<TagTypes extends string = string>(
         return { error: apiError, meta: result.meta };
       }
 
-      const errorMsg = ('error' in fetchError && typeof fetchError.error === 'string') ? fetchError.error : 'check your connection';
+      const errorMsg =
+        'error' in fetchError && typeof fetchError.error === 'string'
+          ? fetchError.error
+          : 'check your connection';
       const networkError: EnvelopeAwareError = {
         status: fetchError.status,
         data: {
-          code: 'NETWORK_ERROR',
-          message: `Network error: ${errorMsg}`,
+          code: fetchError.status === 401 ? 'UNAUTHORIZED' : 'NETWORK_ERROR',
+          message:
+            fetchError.status === 401
+              ? 'Unauthorized'
+              : `Network error: ${errorMsg}`,
           fields: null,
         },
       };
-      logger.error('API network failure', {
-        url: extractUrl(requestArgs),
-        status: String(fetchError.status),
-      });
+      if (fetchError.status !== 401) {
+        logger.error('API network failure', {
+          url: extractUrl(requestArgs),
+          status: String(fetchError.status),
+        });
+      }
       return { error: networkError, meta: result.meta };
     }
 
@@ -191,84 +296,33 @@ export function createBaseApi<TagTypes extends string = string>(
         requestId,
       };
 
+      const reauthResult = await tryReauthAndRetry(
+        code,
+        unwrapped.status ?? 400,
+      );
+      if (reauthResult) {
+        return reauthResult;
+      }
+
       if (code === 'INTERNAL_ERROR') {
-        captureNonFatalError(new Error(`INTERNAL_ERROR: ${unwrapped.message}`), {
-          recentRequestIds: requestId ? [requestId] : undefined,
-        });
+        captureNonFatalError(
+          new Error(`INTERNAL_ERROR: ${unwrapped.message}`),
+          {
+            recentRequestIds: requestId ? [requestId] : undefined,
+          },
+        );
       }
 
       const urlStr = extractUrl(requestArgs);
-      if (!(code === 'RESOURCE_NOT_FOUND' && urlStr.includes('/restaurants/me'))) {
+      if (
+        !(code === 'RESOURCE_NOT_FOUND' && urlStr.includes('/restaurants/me')) &&
+        code !== 'UNAUTHORIZED'
+      ) {
         logger.error('API application error', {
           requestId,
           code,
           url: urlStr,
         });
-      }
-
-      // TOKEN_REUSE_DETECTED — never retry (Blueprint §13.3)
-      if (code === 'TOKEN_REUSE_DETECTED') {
-        await config.onTokenReuseDetected();
-        return {
-          error: { status: unwrapped.status ?? 401, data: unwrapped },
-          meta: result.meta,
-        };
-      }
-
-      // Routine expired access token — coalesce refresh + single retry (§13.2)
-      if (
-        code === 'UNAUTHORIZED' &&
-        !isRefreshEndpoint(extractUrl(requestArgs))
-      ) {
-        const refreshToken = config.getRefreshToken(api.getState());
-        if (refreshToken) {
-          const pair = await performTokenRefresh({
-            baseUrl: config.baseUrl,
-            refreshToken,
-            callbacks: refreshCallbacks,
-          });
-          if (pair) {
-            const retryResult = await rawBaseQuery(
-              requestArgs,
-              api,
-              extraOptions ?? {},
-            );
-            if (retryResult.error) {
-              const retryError = retryResult.error as FetchBaseQueryError;
-              const errorMsg = ('error' in retryError && typeof retryError.error === 'string') ? retryError.error : 'check your connection';
-              return {
-                error: {
-                  status: retryError.status,
-                  data: {
-                    code: 'NETWORK_ERROR',
-                    message: `Network error: ${errorMsg}`,
-                    fields: null,
-                  },
-                },
-                meta: retryResult.meta,
-              };
-            }
-            const retryEnvelope = parseEnvelopeFromUnknown(retryResult.data);
-            recordRequestId(retryEnvelope?.meta?.requestId);
-            if (retryEnvelope?.success) {
-              return { data: retryEnvelope.data, meta: retryResult.meta };
-            }
-            const retryCode = retryEnvelope?.error?.code ?? 'INTERNAL_ERROR';
-            return {
-              error: {
-                status: retryEnvelope?.meta ? 400 : 401,
-                data: {
-                  code: retryCode,
-                  message:
-                    retryEnvelope?.error?.message ?? 'Something went wrong',
-                  fields: retryEnvelope?.error?.fields ?? null,
-                  requestId: retryEnvelope?.meta?.requestId,
-                },
-              },
-              meta: retryResult.meta,
-            };
-          }
-        }
       }
 
       return {

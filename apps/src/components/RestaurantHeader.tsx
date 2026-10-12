@@ -326,6 +326,7 @@ export function RestaurantHeader({
       <RestaurantSupportModal
         visible={supportVisible}
         onClose={() => setSupportVisible(false)}
+        restaurantId={restaurantId || profile?.restaurantId}
         restaurantName={profile?.name || displayTitle || 'Restaurant Partner'}
       />
     </View>
