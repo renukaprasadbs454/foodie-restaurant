@@ -83,8 +83,9 @@
       "apiBaseUrl": "https://api.foodie.kwiko.org",
       "wsUrl": "wss://api.foodie.kwiko.org/ws",
       "eas": {
-        "projectId": "bfdbbd6c-eaae-47ca-8fd8-2d0e015c6ef3"
+        "projectId": "75123efa-0ece-4483-a2c6-2537ea3b4e81"
       }
-    }
+    },
+    "owner": "kavana_yp"
   }
 }
