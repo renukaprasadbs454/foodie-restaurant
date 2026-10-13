@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Modal,
@@ -27,6 +27,7 @@ import {
 import {
   useGetRestaurantProfileQuery,
   useGetRestaurantQuery,
+  useGetRestaurantReviewsQuery,
   useUpdateRestaurantProfileMutation,
   useUploadRestaurantImagesMutation,
   useUpdateTimingsMutation,
@@ -43,7 +44,7 @@ import {
 } from '../../onboarding/types';
 import { toUnwrappedApiError } from '../../auth/apiError';
 import { RestaurantProfileSkeleton } from '../components/RestaurantProfileSkeleton';
-import { validateProfileForm } from '../types';
+import { validateProfileForm, calculateProfileRating } from '../types';
 import type { ProfileStackParamList } from '../../../navigation/types';
 import { logoutRestaurant } from '../../auth/session';
 import { store } from '../../../store/store';
@@ -222,6 +223,15 @@ export function RestaurantProfileScreen({ navigation }: Props) {
     (!isConnected || query.isError || !apiProfile);
 
   const profileData = (apiProfile ?? (isUsingMock ? mockProfile : undefined)) as MockRestaurantProfile | undefined;
+
+  const reviewsQuery = useGetRestaurantReviewsQuery(
+    { restaurantId: restaurantId ?? '', page: 0, size: 100 },
+    { skip: !restaurantId, refetchOnFocus: true }
+  );
+
+  const { ratingDisplay } = useMemo(() => {
+    return calculateProfileRating(reviewsQuery.data, profileData);
+  }, [reviewsQuery.data, profileData]);
 
   const handleError = useApiErrorHandler({
     onToast: (error) => setToast({ message: error.message, variant: 'error' }),
@@ -529,7 +539,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
                     >
                       <Text style={{ color: BRAND_ACCENT, fontSize: 14 }}>★</Text>
                       <Text variant="label" style={{ color: '#92400E', fontWeight: 'bold' }}>
-                        {profileData?.avgRating ? String(profileData.avgRating) : '4.8'} (124 reviews)
+                        {ratingDisplay}
                       </Text>
                     </View>
 

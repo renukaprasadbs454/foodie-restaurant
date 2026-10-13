@@ -59,6 +59,9 @@ export type RestaurantDetail = {
   logoImageUrl?: string | null;
   coverImageUrl?: string | null;
   avgRating?: number | string | null;
+  averageRating?: number | string | null;
+  reviewCount?: number | null;
+  totalReviews?: number | null;
   commissionPct?: number | string | null;
   isOpen?: boolean;
   openTime?: string | null;
