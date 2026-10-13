@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { FlatList, Pressable, RefreshControl, View, StatusBar, Animated } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   EmptyState,
@@ -87,7 +86,7 @@ export function NotificationsScreen(_props: Props) {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#14532D' }} edges={['top', 'left', 'right']}>
+    <View style={{ flex: 1, backgroundColor: '#F2F2F7' }}>
       <StatusBar backgroundColor="#14532D" barStyle="light-content" />
       <Animated.View
         style={{
@@ -97,35 +96,19 @@ export function NotificationsScreen(_props: Props) {
           transform: [{ scale: scaleValue }],
         }}
       >
-        {/* iOS Styled Top curved Header */}
-        <View style={{
-          paddingTop: 36,
-          paddingBottom: 24,
-          paddingHorizontal: 20,
-          backgroundColor: '#14532D',
-          borderBottomLeftRadius: 32,
-          borderBottomRightRadius: 32,
-          shadowColor: '#14532D',
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.15,
-          shadowRadius: 10,
-          elevation: 5
-        }}>
-          <Text style={{ fontSize: 32, fontWeight: '900', color: '#FCD34D', letterSpacing: -0.5 }}>
-            Notifications
-          </Text>
-          {!isConnected ? (
-            <Text style={{ color: '#FCD34D', fontSize: 13, marginTop: 4, fontWeight: '700' }}>
+        {!isConnected ? (
+          <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 2 }}>
+            <Text style={{ color: '#D97706', fontSize: 13, fontWeight: '700' }}>
               Offline — showing cached inbox
             </Text>
-          ) : null}
-        </View>
+          </View>
+        ) : null}
 
         {/* Filter Toolbar */}
         <View style={{
           flexDirection: 'row',
           paddingHorizontal: 16,
-          paddingTop: 16,
+          paddingTop: 12,
           paddingBottom: 8,
           gap: 12
         }}>
@@ -229,6 +212,6 @@ export function NotificationsScreen(_props: Props) {
           onDismiss={() => setToast(null)}
         />
       </Animated.View>
-    </SafeAreaView>
+    </View>
   );
 }
