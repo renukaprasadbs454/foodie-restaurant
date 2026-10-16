@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, View, Linking } from 'react-native';
+import { Platform, RefreshControl, ScrollView, View, Linking, Pressable } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Button,
@@ -14,9 +14,13 @@ import {
   useTheme,
 } from 'foodie-shared-rn';
 import {
+  normalizeOrderItem,
+  useGetOrderCustomerQuery,
   useGetOrderQuery,
   useTransitionOrderStatusMutation,
 } from '../../../api/endpoints/ordersApi';
+import { useGetRestaurantProfileQuery } from '../../../api/endpoints/restaurantsApi';
+import { InvoicePreviewModal } from '../components/InvoicePreviewModal';
 import { toUnwrappedApiError } from '../../auth/apiError';
 import { useAppSelector } from '../../../store/hooks';
 import { selectRestaurantId } from '../../onboarding/restaurantOnboardingSlice';
@@ -39,6 +43,7 @@ import type { OrdersStackParamList } from '../../../navigation/types';
 import { DemoModeIndicator } from '../../../components/DemoModeIndicator';
 import { MOCK_CONFIG } from '../../../config/mockConfig';
 import { getMockOrderDetails, type ExtendedOrderDetail } from '../../../mock';
+import { generateInvoice } from '../utils/invoiceGenerator';
 
 type Props = NativeStackScreenProps<
   OrdersStackParamList,
@@ -61,6 +66,14 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [chatVisible, setChatVisible] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState<boolean>(false);
+
+  const { data: restaurantProfile } = useGetRestaurantProfileQuery();
+
+  const handleInvoiceClick = () => {
+    console.log('Invoice button clicked in OrderDetails -> Opening InvoicePreviewModal', order || localOrder);
+    setShowInvoiceModal(true);
+  };
 
   const [toast, setToast] = useState<{
     message: string;
@@ -75,6 +88,11 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
     refetchOnFocus: true,
   });
 
+  const customerQuery = useGetOrderCustomerQuery(orderId, {
+    skip: !validId,
+  });
+  const customerData = customerQuery.data;
+
   const [transition] = useTransitionOrderStatusMutation();
 
   // Local demo state override for order status transitions
@@ -85,12 +103,21 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
     setLocalOrder(getMockOrderDetails(orderId));
   }, [orderId]);
 
-  const apiOrder = query.data;
+  const apiOrder = (query.data as any)?.data ?? query.data;
   const isUsingMock =
     MOCK_CONFIG.ENABLE_MOCK_FALLBACK &&
     (!isConnected || query.isError || !apiOrder);
 
-  const order = (apiOrder ?? (isUsingMock ? localOrder : undefined)) as ExtendedOrderDetail | undefined;
+  const rawOrder = apiOrder ?? (isUsingMock ? localOrder : undefined);
+  const normalized = rawOrder ? (normalizeOrderItem(rawOrder) as ExtendedOrderDetail) : undefined;
+  const order: ExtendedOrderDetail | undefined = normalized
+    ? {
+        ...normalized,
+        customerName: customerData?.customerName || customerData?.name || normalized.customerName,
+        customerPhone: customerData?.customerPhone || customerData?.phone || normalized.customerPhone,
+        deliveryAddress: customerData?.deliveryAddress || customerData?.address || normalized.deliveryAddress,
+      }
+    : undefined;
 
   const handleError = useApiErrorHandler({
     onToast: (error) => setToast({ message: error.message, variant: 'error' }),
@@ -236,19 +263,35 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
                     </Text>
                   ) : null}
 
-                  {order.customerPhone ? (
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: tokens.spacing.sm, flexWrap: 'wrap' }}>
+                    {order.customerPhone ? (
+                      <Button
+                        label="📞 Call Customer"
+                        accessibilityLabel="Call Customer"
+                        variant="secondary"
+                        style={{ paddingHorizontal: 12, height: 36 }}
+                        onPress={() => {
+                          Linking.openURL(`tel:${order.customerPhone}`).catch(() => {
+                            setToast({ message: `Cannot place call.`, variant: 'error' });
+                          });
+                        }}
+                      />
+                    ) : null}
+
                     <Button
-                      label="📞 Call Customer"
-                      accessibilityLabel="Call Customer"
+                      label="🧾 Invoice"
+                      accessibilityLabel="Preview and Download Invoice"
                       variant="secondary"
-                      style={{ marginTop: tokens.spacing.sm, paddingHorizontal: 12, height: 36, alignSelf: 'flex-start' }}
-                      onPress={() => {
-                        Linking.openURL(`tel:${order.customerPhone}`).catch(() => {
-                          setToast({ message: `Cannot place call.`, variant: 'error' });
-                        });
+                      style={{
+                        paddingHorizontal: 12,
+                        height: 36,
+                        borderColor: BRAND_PRIMARY,
+                        borderWidth: 1.5,
+                        backgroundColor: '#F0FDF4',
                       }}
+                      onPress={handleInvoiceClick}
                     />
-                  ) : null}
+                  </View>
                 </View>
                 <OrderStatusBadge status={order.status} size="lg" />
               </View>
@@ -352,16 +395,32 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
               </View>
             </Card>
 
-            {/* LIVE MESSAGE / CHAT OPTION */}
-            <View style={{ paddingHorizontal: tokens.spacing.md, marginTop: tokens.spacing.md }}>
+            {/* LIVE MESSAGE / CHAT & INVOICE */}
+            <View style={{ flexDirection: 'row', gap: tokens.spacing.sm, paddingHorizontal: tokens.spacing.md, marginTop: tokens.spacing.md }}>
               {order.status && !isTerminalOrderStatus(order.status) ? (
-                <Button
-                  label="💬 Chat with Customer"
-                  accessibilityLabel="Open Chat"
-                  variant="secondary"
-                  onPress={() => setChatVisible(true)}
-                />
+                <View style={{ flex: 1 }}>
+                  <Button
+                    label="💬 Chat with Customer"
+                    accessibilityLabel="Open Chat"
+                    variant="secondary"
+                    onPress={() => setChatVisible(true)}
+                  />
+                </View>
               ) : null}
+
+              <View style={{ flex: 1 }}>
+                <Button
+                  label="🧾 Invoice Preview"
+                  accessibilityLabel="Preview and Download Invoice"
+                  variant="secondary"
+                  onPress={handleInvoiceClick}
+                  style={{
+                    borderColor: BRAND_PRIMARY,
+                    borderWidth: 1.5,
+                    backgroundColor: '#F0FDF4',
+                  }}
+                />
+              </View>
             </View>
 
             <Modal
@@ -439,6 +498,15 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
         }}
         onCancel={() => setShowAcceptModal(false)}
       />
+
+      {/* INVOICE PREVIEW MODAL */}
+      <InvoicePreviewModal
+        visible={showInvoiceModal}
+        onClose={() => setShowInvoiceModal(false)}
+        order={order || localOrder}
+        restaurantProfile={restaurantProfile}
+      />
+
 
       <Toast
         visible={Boolean(toast)}

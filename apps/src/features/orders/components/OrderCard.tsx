@@ -1,7 +1,8 @@
 import React from 'react';
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 import { Button, Card, Text, useTheme } from 'foodie-shared-rn';
-import { useGetOrderQuery } from '../../../api/endpoints/ordersApi';
+import { normalizeOrderItem, useGetOrderQuery } from '../../../api/endpoints/ordersApi';
+import { useGetRestaurantProfileQuery } from '../../../api/endpoints/restaurantsApi';
 import type { OrderSummary, RestaurantTransitionStatus } from '../types';
 import { formatMoney, restaurantActionsForStatus } from '../types';
 import { OrderStatusBadge } from './OrderStatusBadge';
@@ -9,6 +10,7 @@ import { SwipeButton } from '../../../components/SwipeButton';
 import { Modal } from 'foodie-shared-rn';
 import { OrderChat } from './OrderChat';
 import { isTerminalOrderStatus } from '../types';
+import { InvoicePreviewModal } from './InvoicePreviewModal';
 
 type Props = {
   order: OrderSummary;
@@ -19,6 +21,8 @@ type Props = {
   ) => void;
   onOpenRejectModal: (orderId: string, orderNumber: string) => void;
   isTransitioning?: boolean;
+  onInvoice?: (order: OrderSummary) => void | Promise<void>;
+  loadingInvoice?: boolean;
 };
 
 const BRAND_PRIMARY = '#14532D'; // Dark Green
@@ -30,10 +34,49 @@ export function OrderCard({
   onTransitionStatus,
   onOpenRejectModal,
   isTransitioning,
+  onInvoice,
+  loadingInvoice = false,
 }: Props) {
   const { tokens } = useTheme();
   const [chatVisible, setChatVisible] = React.useState(false);
   const [locallyMarkedReady, setLocallyMarkedReady] = React.useState(false);
+  const [localShowInvoiceModal, setLocalShowInvoiceModal] = React.useState(false);
+  const [localSelectedOrder, setLocalSelectedOrder] = React.useState<any>(null);
+
+  const { data: restaurantProfile } = useGetRestaurantProfileQuery();
+
+  const handleInvoiceClick = (e?: any) => {
+    if (e && typeof e.stopPropagation === 'function') {
+      e.stopPropagation();
+    }
+    console.log('Invoice button clicked -> Opening Preview', order);
+    const rawDetail = (detail as any)?.data ?? detail;
+    const normalizedDetail = rawDetail ? normalizeOrderItem(rawDetail) : null;
+    const normalizedOrder = normalizeOrderItem(order);
+
+    const fullOrder: any = normalizedDetail
+      ? {
+          ...normalizedOrder,
+          ...normalizedDetail,
+          orderId: normalizedDetail.orderId || normalizedOrder.orderId,
+          orderNumber: normalizedDetail.orderNumber || normalizedOrder.orderNumber,
+          customerName: normalizedDetail.customerName || normalizedOrder.customerName,
+          customerPhone: normalizedDetail.customerPhone || normalizedOrder.customerPhone,
+          deliveryAddress: normalizedDetail.deliveryAddress || normalizedOrder.deliveryAddress,
+          paymentMethod: normalizedDetail.paymentMethod || normalizedOrder.paymentMethod,
+          paymentStatus: normalizedDetail.paymentStatus || normalizedOrder.paymentStatus,
+          transactionId: normalizedDetail.transactionId || normalizedOrder.transactionId,
+          items: (normalizedDetail.items && normalizedDetail.items.length > 0) ? normalizedDetail.items : normalizedOrder.items,
+        }
+      : normalizedOrder;
+
+    if (onInvoice) {
+      onInvoice(fullOrder);
+      return;
+    }
+    setLocalSelectedOrder(fullOrder);
+    setLocalShowInvoiceModal(true);
+  };
 
   // Optionally fetch full OrderDetail for line items breakdown if available
   const orderDetailsQuery = useGetOrderQuery(order.orderId, {
@@ -41,7 +84,7 @@ export function OrderCard({
   });
 
   const detail = orderDetailsQuery.data;
-  const items = detail?.items ?? [];
+  const items = detail?.items ?? order.items ?? [];
   const status = order.status;
   const isPending = ['CONFIRMED', 'PENDING', 'PLACED'].includes(status);
   const hasBeenMarkedReady = detail?.orderStatusEvents?.some((e: any) => e.toStatus === 'READY_FOR_PICKUP') ?? false;
@@ -110,7 +153,8 @@ export function OrderCard({
           </View>
 
           <Text variant="caption" color={tokens.color.textSecondary}>
-            Customer ID: {detail?.customerId ? `${detail.customerId.slice(0, 10)}…` : 'Verified Guest'}
+            👤 Customer: {detail?.customerName || order.customerName || 'Customer'}
+            {(detail?.customerPhone || order.customerPhone) ? ` • 📞 ${detail?.customerPhone || order.customerPhone}` : ''}
           </Text>
 
           <Text variant="caption" color={tokens.color.textSecondary}>
@@ -181,18 +225,46 @@ export function OrderCard({
         </View>
       </View>
 
-      {/* LIVE MESSAGE / CHAT OPTION */}
-      {status && !isTerminalOrderStatus(status) ? (
-        <View style={{ paddingTop: tokens.spacing.xs }}>
+      {/* ACTION BUTTONS: CHAT & INVOICE */}
+      <View
+        style={{
+          flexDirection: 'row',
+          gap: tokens.spacing.sm,
+          paddingTop: tokens.spacing.xs,
+        }}
+      >
+        {status && !isTerminalOrderStatus(status) ? (
           <Button
-            label="💬 Chat with Customer"
+            label="💬 Chat"
             accessibilityLabel="Open Chat"
             variant="secondary"
             onPress={() => setChatVisible(true)}
-            style={{ borderRadius: 10, height: 44 }}
+            style={{ flex: 1, borderRadius: 10, height: 42 }}
           />
-        </View>
-      ) : null}
+        ) : null}
+
+        <Button
+          label="🧾 Invoice"
+          accessibilityLabel={`Preview Invoice for order ${order.orderNumber}`}
+          variant="secondary"
+          onPress={handleInvoiceClick}
+          style={{
+            flex: 1,
+            borderRadius: 10,
+            height: 42,
+            borderColor: BRAND_PRIMARY,
+            borderWidth: 1.5,
+            backgroundColor: '#F0FDF4',
+          }}
+        />
+      </View>
+
+      <InvoicePreviewModal
+        visible={localShowInvoiceModal}
+        onClose={() => setLocalShowInvoiceModal(false)}
+        order={localSelectedOrder || (detail ? { ...order, ...detail } : order)}
+        restaurantProfile={restaurantProfile}
+      />
 
       <Modal
         visible={chatVisible}

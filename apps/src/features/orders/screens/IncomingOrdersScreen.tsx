@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -10,6 +11,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Button,
   Card,
+  Modal,
   Text,
   TextInput,
   Toast,
@@ -19,10 +21,13 @@ import {
   useTheme,
 } from 'foodie-shared-rn';
 import {
+  normalizeOrderItem,
   ordersApi,
   useGetRestaurantOrdersQuery,
   useTransitionOrderStatusMutation,
 } from '../../../api/endpoints/ordersApi';
+import { useGetRestaurantProfileQuery } from '../../../api/endpoints/restaurantsApi';
+import { InvoicePreviewModal } from '../components/InvoicePreviewModal';
 import { useAppDispatch, useAppSelector } from '../../../store/hooks';
 import { selectRestaurantId } from '../../onboarding/restaurantOnboardingSlice';
 import { toUnwrappedApiError } from '../../auth/apiError';
@@ -85,6 +90,19 @@ export function IncomingOrdersScreen({ navigation }: Props) {
   const [dismissedAlertOrderIds, setDismissedAlertOrderIds] = useState<string[]>([]);
   const [forcePickedUpIds, setForcePickedUpIds] = useState<string[]>([]);
 
+  // Invoice preview modal state
+  const [showInvoiceModal, setShowInvoiceModal] = useState<boolean>(false);
+  const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<any | null>(null);
+
+  const { data: restaurantProfile } = useGetRestaurantProfileQuery();
+
+  const handleInvoiceClick = (targetOrder: any) => {
+    console.log('Invoice button clicked -> Opening InvoicePreviewModal', targetOrder);
+    const normalized = normalizeOrderItem(targetOrder);
+    setSelectedInvoiceOrder({ ...targetOrder, ...normalized });
+    setShowInvoiceModal(true);
+  };
+
   // Local state for demo mode transitions
   const [localOrders, setLocalOrders] = useState<ExtendedOrderDetail[]>(MOCK_ORDERS);
   const [manualRefresh, setManualRefresh] = useState(false);
@@ -130,16 +148,14 @@ export function IncomingOrdersScreen({ navigation }: Props) {
       baseList = apiOrders as unknown as ExtendedOrderDetail[];
     }
 
-    return baseList.map((o) => ({
-      orderId: o.orderId,
-      orderNumber: o.orderNumber,
-      status: forcePickedUpIds.includes(o.orderId) ? ('PICKED_UP' as any) : o.status,
-      restaurantId: o.restaurantId,
-      totalAmount: o.totalAmount,
-      placedAt: o.placedAt,
-      customerName: o.customerName,
-      items: o.items,
-    }));
+    return baseList.map((o: any) => {
+      const norm = normalizeOrderItem(o);
+      return {
+        ...o,
+        ...norm,
+        status: forcePickedUpIds.includes(norm.orderId) ? ('PICKED_UP' as any) : norm.status,
+      };
+    });
   }, [apiOrders, localOrders, forcePickedUpIds]);
 
   // Compute live count badges for each filter
@@ -510,6 +526,7 @@ export function IncomingOrdersScreen({ navigation }: Props) {
                 key={order.orderId}
                 order={order}
                 isTransitioning={false}
+                onInvoice={handleInvoiceClick}
                 onViewDetails={() => {
                   trackAnalyticsEvent('order_opened', { orderId: order.orderId });
                   navigation.navigate('RestaurantOrderDetails', {
@@ -585,6 +602,17 @@ export function IncomingOrdersScreen({ navigation }: Props) {
           }
         }}
         onCancel={() => setRejectingOrder(null)}
+      />
+
+      {/* INVOICE PREVIEW MODAL */}
+      <InvoicePreviewModal
+        visible={showInvoiceModal}
+        onClose={() => {
+          setShowInvoiceModal(false);
+          setSelectedInvoiceOrder(null);
+        }}
+        order={selectedInvoiceOrder}
+        restaurantProfile={restaurantProfile}
       />
 
       <Toast

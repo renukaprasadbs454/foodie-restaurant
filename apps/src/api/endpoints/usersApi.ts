@@ -34,7 +34,12 @@ export const usersApi = baseApi.injectEndpoints({
       },
       invalidatesTags: [{ type: 'Restaurant', id: 'LIST' }],
     }),
+    getUserById: builder.query<any, string>({
+      query: (userId) => `/api/v1/users/${userId}`,
+      transformResponse: (response: any) => response?.data ?? response,
+      keepUnusedDataFor: 300,
+    }),
   }),
 });
 
-export const { useUploadProfileImageMutation } = usersApi;
+export const { useUploadProfileImageMutation, useGetUserByIdQuery } = usersApi;

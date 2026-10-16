@@ -30,6 +30,7 @@ export function getMockDashboardSummaryData(ordersList = MOCK_ORDERS): Dashboard
   }, 0);
 
   const recentOrders: OrderSummary[] = ordersList.slice(0, 5).map((o) => ({
+    ...o,
     orderId: o.orderId,
     orderNumber: o.orderNumber,
     status: o.status,

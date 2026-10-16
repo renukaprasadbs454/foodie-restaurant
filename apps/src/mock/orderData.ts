@@ -5,16 +5,19 @@ export type ExtendedOrderDetail = OrderDetail & {
   customerName: string;
   customerPhone?: string;
   deliveryAddress?: string;
+  id?: string;
 };
 
 export const MOCK_ORDERS: ExtendedOrderDetail[] = [
   {
+    id: 'FD-20261016-000001',
     orderId: '10000000-0000-4000-8000-000000000001',
     orderNumber: '#ORD-2026-0801',
     status: 'CONFIRMED',
     customerId: 'cust-101',
-    customerName: 'Rahul Sharma',
-    customerPhone: '+91 98111 22334',
+    userId: 'cust-101',
+    customerName: 'Aarav Patel',
+    customerPhone: '+91 98451 12233',
     deliveryAddress: 'Flat 402, Green Acres, Koramangala 4th Block, Bengaluru',
     restaurantId: MOCK_CONFIG.DEFAULT_MOCK_RESTAURANT_ID,
     subtotal: 936,
@@ -22,7 +25,11 @@ export const MOCK_ORDERS: ExtendedOrderDetail[] = [
     discountAmount: 50,
     taxAmount: 46.8,
     totalAmount: 972.8,
+    paymentMethod: 'ONLINE',
+    paymentStatus: 'PAID',
+    transactionId: 'TXN_982347612',
     placedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
     items: [
       {
         menuItemId: 'm1000001-0000-4000-8000-000000000001',
@@ -55,10 +62,12 @@ export const MOCK_ORDERS: ExtendedOrderDetail[] = [
     ],
   },
   {
+    id: 'FD-20261016-000002',
     orderId: '10000000-0000-4000-8000-000000000002',
     orderNumber: '#ORD-2026-0802',
     status: 'ACCEPTED',
     customerId: 'cust-102',
+    userId: 'cust-102',
     customerName: 'Ananya Roy',
     customerPhone: '+91 98222 33445',
     deliveryAddress: '32 1st Main, HSR Layout Sector 1, Bengaluru',
@@ -68,7 +77,10 @@ export const MOCK_ORDERS: ExtendedOrderDetail[] = [
     discountAmount: 0,
     taxAmount: 42.4,
     totalAmount: 930.4,
+    paymentMethod: 'COD',
+    paymentStatus: 'PENDING',
     placedAt: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 26 * 60 * 1000).toISOString(),
     items: [
       {
         menuItemId: 'm1000007-0000-4000-8000-000000000007',
@@ -108,10 +120,12 @@ export const MOCK_ORDERS: ExtendedOrderDetail[] = [
     ],
   },
   {
+    id: 'FD-20261016-000003',
     orderId: '10000000-0000-4000-8000-000000000003',
     orderNumber: '#ORD-2026-0803',
     status: 'PREPARING',
     customerId: 'cust-103',
+    userId: 'cust-103',
     customerName: 'Vikramaditya Verma',
     customerPhone: '+91 98333 44556',
     deliveryAddress: 'Villa 14, Palm Meadows, Whitefield, Bengaluru',
@@ -121,7 +135,11 @@ export const MOCK_ORDERS: ExtendedOrderDetail[] = [
     discountAmount: 40,
     taxAmount: 43.3,
     totalAmount: 899.3,
+    paymentMethod: 'ONLINE',
+    paymentStatus: 'PAID',
+    transactionId: 'TXN_774920194',
     placedAt: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 36 * 60 * 1000).toISOString(),
     items: [
       {
         menuItemId: 'm1000004-0000-4000-8000-000000000004',
@@ -171,6 +189,7 @@ export const MOCK_ORDERS: ExtendedOrderDetail[] = [
     orderNumber: '#ORD-2026-0804',
     status: 'READY_FOR_PICKUP',
     customerId: 'cust-104',
+    userId: 'cust-104',
     customerName: 'Priya Sundaram',
     customerPhone: '+91 98444 55667',
     deliveryAddress: '502 Prestige Towers, Indiranagar, Bengaluru',
@@ -180,7 +199,10 @@ export const MOCK_ORDERS: ExtendedOrderDetail[] = [
     discountAmount: 0,
     taxAmount: 37.8,
     totalAmount: 828.8,
+    paymentMethod: 'COD',
+    paymentStatus: 'PENDING',
     placedAt: new Date(Date.now() - 50 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 52 * 60 * 1000).toISOString(),
     items: [
       {
         menuItemId: 'm1000006-0000-4000-8000-000000000006',
@@ -217,6 +239,7 @@ export const MOCK_ORDERS: ExtendedOrderDetail[] = [
     orderNumber: '#ORD-2026-0805',
     status: 'DELIVERED',
     customerId: 'cust-105',
+    userId: 'cust-105',
     customerName: 'Amit Patel',
     customerPhone: '+91 98555 66778',
     deliveryAddress: 'Block C 102, Shantiniketan Apartments, Electronic City, Bengaluru',
@@ -226,7 +249,11 @@ export const MOCK_ORDERS: ExtendedOrderDetail[] = [
     discountAmount: 50,
     taxAmount: 36.85,
     totalAmount: 763.85,
+    paymentMethod: 'ONLINE',
+    paymentStatus: 'PAID',
+    transactionId: 'TXN_458921043',
     placedAt: new Date(Date.now() - 120 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 122 * 60 * 1000).toISOString(),
     items: [
       {
         menuItemId: 'm1000003-0000-4000-8000-000000000003',
@@ -264,6 +291,7 @@ export const MOCK_ORDERS: ExtendedOrderDetail[] = [
     orderNumber: '#ORD-2026-0806',
     status: 'DELIVERED',
     customerId: 'cust-106',
+    userId: 'cust-106',
     customerName: 'Sneha Kulkarni',
     customerPhone: '+91 98666 77889',
     deliveryAddress: '88 4th Cross, Malleshwaram, Bengaluru',
@@ -273,7 +301,11 @@ export const MOCK_ORDERS: ExtendedOrderDetail[] = [
     discountAmount: 25,
     taxAmount: 27.95,
     totalAmount: 591.95,
+    paymentMethod: 'ONLINE',
+    paymentStatus: 'PAID',
+    transactionId: 'TXN_110938475',
     placedAt: new Date(Date.now() - 180 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 185 * 60 * 1000).toISOString(),
     items: [
       {
         menuItemId: 'm1000009-0000-4000-8000-000000000009',
@@ -304,6 +336,7 @@ export const MOCK_ORDERS: ExtendedOrderDetail[] = [
     orderNumber: '#ORD-2026-0807',
     status: 'DELIVERED',
     customerId: 'cust-107',
+    userId: 'cust-107',
     customerName: 'Karthik Rajan',
     customerPhone: '+91 98777 88990',
     deliveryAddress: '15 JP Nagar 6th Phase, Bengaluru',
@@ -313,7 +346,10 @@ export const MOCK_ORDERS: ExtendedOrderDetail[] = [
     discountAmount: 40,
     taxAmount: 40.85,
     totalAmount: 857.85,
+    paymentMethod: 'COD',
+    paymentStatus: 'PAID',
     placedAt: new Date(Date.now() - 240 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 245 * 60 * 1000).toISOString(),
     items: [
       {
         menuItemId: 'm1000005-0000-4000-8000-000000000005',
@@ -344,6 +380,7 @@ export const MOCK_ORDERS: ExtendedOrderDetail[] = [
     orderNumber: '#ORD-2026-0808',
     status: 'REJECTED',
     customerId: 'cust-108',
+    userId: 'cust-108',
     customerName: 'Rajesh Gupta',
     customerPhone: '+91 98888 99001',
     deliveryAddress: 'Flat 101, Lakeview Residency, Bellandur, Bengaluru',
@@ -353,7 +390,10 @@ export const MOCK_ORDERS: ExtendedOrderDetail[] = [
     discountAmount: 0,
     taxAmount: 17.45,
     totalAmount: 396.45,
+    paymentMethod: 'ONLINE',
+    paymentStatus: 'PENDING',
     placedAt: new Date(Date.now() - 300 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 305 * 60 * 1000).toISOString(),
     items: [
       {
         menuItemId: 'm1000001-0000-4000-8000-000000000001',
@@ -382,4 +422,12 @@ export const MOCK_ORDER_SUMMARIES: OrderSummary[] = MOCK_ORDERS.map((o) => ({
   restaurantId: o.restaurantId,
   totalAmount: o.totalAmount,
   placedAt: o.placedAt,
+  createdAt: o.createdAt,
+  customerName: o.customerName,
+  customerPhone: o.customerPhone,
+  userId: o.userId,
+  paymentMethod: o.paymentMethod,
+  paymentStatus: o.paymentStatus,
+  transactionId: o.transactionId,
+  items: o.items,
 }));

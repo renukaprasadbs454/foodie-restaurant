@@ -11,6 +11,15 @@ export type OrderSummary = {
   restaurantId?: string;
   totalAmount: number | string;
   placedAt?: string;
+  createdAt?: string;
+  customerName?: string;
+  customerPhone?: string;
+  deliveryAddress?: any;
+  userId?: string;
+  paymentMethod?: string;
+  paymentStatus?: string;
+  transactionId?: string;
+  items?: OrderLineItem[];
 };
 
 export type OrderLineItem = {
@@ -38,14 +47,23 @@ export type OrderDetail = {
   orderNumber: string;
   status: string;
   customerId?: string;
+  userId?: string;
   restaurantId?: string;
   addressId?: string;
+  deliveryAddress?: any;
   subtotal: number | string;
   deliveryFee: number | string;
   discountAmount: number | string;
   taxAmount: number | string;
   totalAmount: number | string;
   placedAt?: string;
+  createdAt?: string;
+  customerName?: string;
+  customerPhone?: string;
+  paymentMethod?: string;
+  paymentStatus?: string;
+  transactionId?: string;
+  paymentId?: string;
   items?: OrderLineItem[];
   orderStatusEvents?: OrderStatusEvent[];
 };
