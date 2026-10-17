@@ -17,6 +17,9 @@ export type OrderSummary = {
   deliveryAddress?: any;
   userId?: string;
   paymentMethod?: string;
+  paymentMode?: string;
+  isCOD?: boolean;
+  isCod?: boolean;
   paymentStatus?: string;
   transactionId?: string;
   items?: OrderLineItem[];
@@ -43,6 +46,7 @@ export type OrderStatusEvent = {
 };
 
 export type OrderDetail = {
+  id?: string;
   orderId: string;
   orderNumber: string;
   status: string;
@@ -61,11 +65,22 @@ export type OrderDetail = {
   customerName?: string;
   customerPhone?: string;
   paymentMethod?: string;
+  paymentMode?: string;
+  isCOD?: boolean;
+  isCod?: boolean;
   paymentStatus?: string;
   transactionId?: string;
   paymentId?: string;
   items?: OrderLineItem[];
   orderStatusEvents?: OrderStatusEvent[];
+};
+
+export type OrderPaymentInfo = {
+  paymentMethod: string;
+  paymentMode?: string;
+  paymentStatus: string;
+  transactionId?: string | null;
+  isCOD: boolean;
 };
 
 export type RestaurantOrdersParams = {

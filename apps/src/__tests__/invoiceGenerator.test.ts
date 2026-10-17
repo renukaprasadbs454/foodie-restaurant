@@ -148,23 +148,54 @@ describe('DELIMO Invoice Generator', () => {
   it('correctly extracts dynamic payment methods for COD vs ONLINE across all fields', () => {
     const { extractPaymentDetails } = require('../features/orders/utils/invoiceGenerator');
 
-    // COD variants
+    // COD variants (paymentMethod, paymentMode, method, paymentType, isCOD, cod boolean)
     expect(extractPaymentDetails({ paymentMethod: 'COD' }).isCOD).toBe(true);
     expect(extractPaymentDetails({ paymentMode: 'cash' }).isCOD).toBe(true);
+    expect(extractPaymentDetails({ method: 'cash_on_delivery' }).isCOD).toBe(true);
+    expect(extractPaymentDetails({ paymentType: 'COD' }).isCOD).toBe(true);
+    expect(extractPaymentDetails({ isCOD: true }).isCOD).toBe(true);
     expect(extractPaymentDetails({ isCod: true }).isCOD).toBe(true);
+    expect(extractPaymentDetails({ cod: true }).isCOD).toBe(true);
+    expect(extractPaymentDetails({ isCOD: 'true' }).isCOD).toBe(true);
     expect(extractPaymentDetails({ payment: { method: 'CASH_ON_DELIVERY' } }).isCOD).toBe(true);
-    expect(extractPaymentDetails({ paymentMethod: 'cod' }).paymentMethodText).toBe('CASH ON DELIVERY');
+    expect(extractPaymentDetails({ paymentDetails: { mode: 'cod' } }).isCOD).toBe(true);
 
-    // Online variants
+    // COD must show CASH ON DELIVERY, PENDING, and hide Transaction ID completely
+    const codRes = extractPaymentDetails({ paymentMethod: 'cod', transactionId: 'LEAKED_ID' });
+    expect(codRes.paymentMethodText).toBe('CASH ON DELIVERY');
+    expect(codRes.paymentStatusText).toBe('PENDING');
+    expect(codRes.transactionId).toBe('');
+
+    // Online variants must show ONLINE PAYMENT, PAID, and real Transaction ID
     const online = extractPaymentDetails({ paymentMethod: 'ONLINE', transactionId: 'TXN_999' });
     expect(online.isCOD).toBe(false);
     expect(online.paymentMethodText).toBe('ONLINE PAYMENT');
     expect(online.paymentStatusText).toBe('PAID');
     expect(online.transactionId).toBe('TXN_999');
 
-    // Merged from detail
-    const merged = extractPaymentDetails({ paymentMethod: undefined }, { paymentMethod: 'cash_on_delivery' });
-    expect(merged.isCOD).toBe(true);
-    expect(merged.paymentMethodText).toBe('CASH ON DELIVERY');
+    // Real payment methods (UPI, Card, Net Banking, Wallet)
+    const upiRes = extractPaymentDetails({ paymentMethod: 'UPI', transactionId: 'TXN_UPI_123' });
+    expect(upiRes.paymentMethodText).toBe('UPI');
+    expect(upiRes.paymentStatusText).toBe('PAID');
+    expect(upiRes.transactionId).toBe('TXN_UPI_123');
+
+    const cardRes = extractPaymentDetails({ paymentMethod: 'CREDIT_CARD', transactionId: 'TXN_CARD_456' });
+    expect(cardRes.paymentMethodText).toBe('CREDIT CARD');
+
+    const netBankingRes = extractPaymentDetails({ paymentMethod: 'NET_BANKING', transactionId: 'TXN_NB_789' });
+    expect(netBankingRes.paymentMethodText).toBe('NET BANKING');
+
+    const walletRes = extractPaymentDetails({ paymentMethod: 'WALLET', transactionId: 'TXN_WAL_101' });
+    expect(walletRes.paymentMethodText).toBe('WALLET');
+
+    // Prevent undefined in detail from clobbering COD in order
+    const mergedCod = extractPaymentDetails(
+      { paymentMethod: 'COD', isCOD: true },
+      { paymentMethod: undefined, paymentMode: undefined }
+    );
+    expect(mergedCod.isCOD).toBe(true);
+    expect(mergedCod.paymentMethodText).toBe('CASH ON DELIVERY');
+    expect(mergedCod.paymentStatusText).toBe('PENDING');
+    expect(mergedCod.transactionId).toBe('');
   });
 });

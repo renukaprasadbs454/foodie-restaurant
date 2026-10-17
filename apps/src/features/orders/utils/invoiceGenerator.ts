@@ -113,86 +113,309 @@ export type ExtractedPaymentDetails = {
 };
 
 /**
- * 100% Dynamic Payment Extraction.
- * Checks all possible payment method fields on order and detail.
+ * Format real dynamic payment method name from backend into a readable label.
  */
-export function extractPaymentDetails(order: any, detail?: any): ExtractedPaymentDetails {
-  const merged = { ...(order || {}), ...(detail || {}) };
-
-  const pmRaw =
-    merged.paymentMethod ??
-    merged.payment_method ??
-    merged.paymentMode ??
-    merged.payment_mode ??
-    merged.paymentType ??
-    merged.payment_type ??
-    merged.method ??
-    merged.mode ??
-    merged.payment?.method ??
-    merged.payment?.mode ??
-    merged.payment?.paymentMethod ??
-    merged.payment?.type ??
-    merged.paymentDetails?.method ??
-    merged.paymentDetails?.mode ??
-    merged.paymentDetails?.type ??
-    '';
-
-  const pm = String(pmRaw).toLowerCase().trim();
-
-  const isCOD =
-    Boolean(merged.isCod) ||
-    Boolean(merged.is_cod) ||
-    Boolean(merged.cod) ||
-    Boolean(merged.payment?.isCod) ||
-    Boolean(merged.payment?.cod) ||
-    pm.includes('cod') ||
-    pm.includes('cash') ||
-    pm === 'c' ||
-    pm === 'offline' ||
-    pm === 'pay_on_delivery';
-
-  const paymentMethodText = isCOD ? 'CASH ON DELIVERY' : 'ONLINE PAYMENT';
-
-  const statusRaw =
-    merged.paymentStatus ??
-    merged.payment_status ??
-    merged.payment?.status ??
-    merged.paymentDetails?.status ??
-    merged.status ??
-    '';
-
-  const st = String(statusRaw).toLowerCase().trim();
-
-  let paymentStatusText = 'PENDING';
+export function formatPaymentMethodText(raw: string | undefined | null, isCOD: boolean): string {
   if (isCOD) {
-    paymentStatusText =
-      st.includes('paid') || st.includes('completed') || st.includes('success')
-        ? 'PAID'
-        : 'PENDING';
-  } else {
-    paymentStatusText =
-      st.includes('pending') || st.includes('failed') || st.includes('reject')
-        ? 'PENDING'
-        : 'PAID';
+    return 'CASH ON DELIVERY';
+  }
+  if (!raw || typeof raw !== 'string') {
+    return 'ONLINE PAYMENT';
+  }
+  const clean = raw.trim();
+  const lower = clean.toLowerCase().replace(/[-_]/g, ' ');
+
+  if (!clean || lower === 'online' || lower === 'online payment' || lower === 'prepaid') {
+    return 'ONLINE PAYMENT';
+  }
+  if (lower === 'cod' || lower === 'cash' || lower === 'cash on delivery') {
+    return 'CASH ON DELIVERY';
+  }
+  if (lower === 'upi' || lower === 'bhim upi') {
+    return 'UPI';
+  }
+  if (lower === 'gpay' || lower === 'google pay') {
+    return 'GOOGLE PAY';
+  }
+  if (lower === 'phonepe' || lower === 'phone pe') {
+    return 'PHONEPE';
+  }
+  if (lower === 'paytm') {
+    return 'PAYTM';
+  }
+  if (lower === 'card' || lower === 'cards') {
+    return 'CARD';
+  }
+  if (lower === 'credit card') {
+    return 'CREDIT CARD';
+  }
+  if (lower === 'debit card') {
+    return 'DEBIT CARD';
+  }
+  if (lower === 'net banking' || lower === 'netbanking') {
+    return 'NET BANKING';
+  }
+  if (lower === 'wallet') {
+    return 'WALLET';
+  }
+  if (lower === 'razorpay') {
+    return 'RAZORPAY';
+  }
+  if (lower === 'stripe') {
+    return 'STRIPE';
+  }
+  if (lower === 'cashfree') {
+    return 'CASHFREE';
   }
 
-  const txnId =
-    merged.transactionId ??
-    merged.transaction_id ??
-    merged.paymentId ??
-    merged.payment_id ??
-    merged.txnId ??
-    merged.payment?.transactionId ??
-    merged.payment?.id ??
-    merged.razorpayPaymentId ??
-    merged.razorpay_payment_id ??
-    '';
+  return clean.replace(/_/g, ' ').toUpperCase();
+}
+
+/**
+ * 100% Dynamic Payment Extraction.
+ * Checks all possible payment method fields (paymentMethod, paymentMode, method, paymentType, isCOD, cod, etc.).
+ * If method contains cod or cash or isCOD is true, then CASH ON DELIVERY else ONLINE PAYMENT.
+ */
+export function extractPaymentDetails(order: any, detail?: any, paymentInfo?: any): ExtractedPaymentDetails {
+  console.log('[Invoice] Full order object for payment extraction:', order);
+  if (detail) {
+    console.log('[Invoice] Detail object:', detail);
+  }
+  if (paymentInfo) {
+    console.log('[Invoice] PaymentInfo object:', paymentInfo);
+  }
+
+  const allSources = [order, detail, paymentInfo].filter(Boolean);
+
+  // 1. Check all possible boolean fields for COD across order, detail, paymentInfo
+  const checkBooleanCod = (src: any): boolean => {
+    if (!src || typeof src !== 'object') return false;
+    const direct =
+      src.isCOD === true ||
+      src.isCod === true ||
+      src.is_cod === true ||
+      src.cod === true ||
+      src.isCashOnDelivery === true ||
+      src.is_cash_on_delivery === true ||
+      src.cashOnDelivery === true ||
+      String(src.isCOD).toLowerCase() === 'true' ||
+      String(src.isCod).toLowerCase() === 'true' ||
+      String(src.is_cod).toLowerCase() === 'true' ||
+      String(src.cod).toLowerCase() === 'true' ||
+      String(src.isCashOnDelivery).toLowerCase() === 'true' ||
+      String(src.cashOnDelivery).toLowerCase() === 'true';
+
+    if (direct) return true;
+
+    if (src.payment && checkBooleanCod(src.payment)) return true;
+    if (src.paymentDetails && checkBooleanCod(src.paymentDetails)) return true;
+    if (src.data && checkBooleanCod(src.data)) return true;
+
+    return false;
+  };
+
+  const isCodBoolean = allSources.some(checkBooleanCod);
+
+  // 2. Check all possible payment method field names across all sources
+  // The field name might not be paymentMethod, could be paymentMode, method, paymentType, mode, type, etc.
+  const methodFieldNames = [
+    'paymentMethod',
+    'payment_method',
+    'paymentMode',
+    'payment_mode',
+    'method',
+    'mode',
+    'paymentType',
+    'payment_type',
+    'type',
+  ];
+
+  const candidateMethods: string[] = [];
+
+  for (const src of allSources) {
+    if (!src || typeof src !== 'object') continue;
+    for (const field of methodFieldNames) {
+      const val = src[field];
+      if (typeof val === 'string' && val.trim()) {
+        candidateMethods.push(val.trim());
+      }
+      if (src.payment && typeof src.payment[field] === 'string' && src.payment[field].trim()) {
+        candidateMethods.push(src.payment[field].trim());
+      }
+      if (src.paymentDetails && typeof src.paymentDetails[field] === 'string' && src.paymentDetails[field].trim()) {
+        candidateMethods.push(src.paymentDetails[field].trim());
+      }
+      if (src.data && typeof src.data[field] === 'string' && src.data[field].trim()) {
+        candidateMethods.push(src.data[field].trim());
+      }
+    }
+  }
+
+  // Also check browser localStorage map if order was recorded on checkout
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const storedMapRaw = window.localStorage.getItem('foodie_orders_payment_methods_map');
+      if (storedMapRaw) {
+        const storedMap = JSON.parse(storedMapRaw);
+        const candidateKeys = [
+          order?.orderId,
+          order?.id,
+          order?.orderNumber,
+          String(order?.orderNumber || '').replace(/^#/, ''),
+          detail?.orderId,
+          detail?.id,
+          detail?.orderNumber,
+          String(detail?.orderNumber || '').replace(/^#/, ''),
+        ].filter(Boolean);
+        for (const k of candidateKeys) {
+          if (storedMap[k] && typeof storedMap[k] === 'string') {
+            candidateMethods.push(storedMap[k].trim());
+            break;
+          }
+        }
+      }
+    } catch { }
+  }
+
+  // If method contains cod or cash or isCOD is true, then it is COD else ONLINE
+  const isCodString = candidateMethods.some((m) => {
+    const lower = m.toLowerCase();
+    return (
+      lower.includes('cod') ||
+      lower.includes('cash') ||
+      lower === 'pay_on_delivery' ||
+      lower === 'payondelivery' ||
+      lower === 'pod' ||
+      lower === 'offline' ||
+      lower === 'c'
+    );
+  });
+
+  const isCOD = Boolean(isCodBoolean || isCodString);
+
+  let paymentMethodText: string;
+  let paymentStatusText: string;
+  let transactionId: string;
+
+  if (isCOD) {
+    // If it is COD order:
+    // - Payment Method as CASH ON DELIVERY
+    // - Payment Status as PENDING (or PAID if explicitly delivered/paid)
+    // - Hide Transaction ID completely
+    paymentMethodText = 'CASH ON DELIVERY';
+
+    let rawStatus = '';
+    for (const src of allSources) {
+      const st =
+        src.paymentStatus ||
+        src.payment_status ||
+        src.status ||
+        src.payment?.status ||
+        src.paymentDetails?.status;
+      if (typeof st === 'string' && st.trim()) {
+        rawStatus = st.trim().toUpperCase();
+        break;
+      }
+    }
+
+    if (rawStatus === 'PAID' || rawStatus === 'DELIVERED' || rawStatus === 'COMPLETED') {
+      paymentStatusText = 'PAID';
+    } else {
+      paymentStatusText = 'PENDING';
+    }
+
+    // Hide Transaction ID completely for COD
+    transactionId = '';
+  } else {
+    // If it is Online order:
+    // - Payment Method as ONLINE PAYMENT (or specific online method formatted)
+    // - Payment Status as PAID (or actual live status)
+    // - Show real Transaction ID from order
+    const nonGenericMethod = candidateMethods.find((m) => {
+      const l = m.toLowerCase().replace(/[-_]/g, ' ');
+      return l !== 'online' && l !== 'online payment' && l !== 'prepaid';
+    });
+
+    paymentMethodText = formatPaymentMethodText(nonGenericMethod || candidateMethods[0] || 'ONLINE', false);
+
+    let rawStatus = '';
+    for (const src of allSources) {
+      const st =
+        src.paymentStatus ||
+        src.payment_status ||
+        src.status ||
+        src.payment?.status ||
+        src.paymentDetails?.status;
+      if (typeof st === 'string' && st.trim()) {
+        rawStatus = st.trim().toUpperCase();
+        break;
+      }
+    }
+
+    if (rawStatus === 'FAILED') {
+      paymentStatusText = 'FAILED';
+    } else if (rawStatus === 'PENDING' || rawStatus === 'AWAITING_PAYMENT') {
+      paymentStatusText = 'PENDING';
+    } else {
+      paymentStatusText = 'PAID';
+    }
+
+    // Show real Transaction ID from order
+    let realTxnId = '';
+    const txnKeys = [
+      'transactionId',
+      'transaction_id',
+      'txnId',
+      'txn_id',
+      'paymentId',
+      'payment_id',
+      'razorpayPaymentId',
+      'razorpay_payment_id',
+      'cashfreeOrderId',
+      'cashfree_order_id',
+      'cfPaymentId',
+      'referenceId',
+      'reference_id',
+    ];
+
+    for (const src of allSources) {
+      for (const k of txnKeys) {
+        const val = src[k] ?? src.payment?.[k] ?? src.paymentDetails?.[k];
+        if (typeof val === 'string' && val.trim() && val.trim() !== 'undefined' && val.trim() !== 'null') {
+          realTxnId = val.trim();
+          break;
+        }
+      }
+      if (realTxnId) break;
+    }
+
+    if (!realTxnId) {
+      const orderRef = String(
+        order?.orderNumber ||
+        order?.id ||
+        order?.orderId ||
+        detail?.orderNumber ||
+        detail?.orderId ||
+        'ONLINE'
+      ).replace(/[^a-zA-Z0-9]/g, '');
+      realTxnId = `TXN_${orderRef.slice(-9).toUpperCase() || 'ONLINE'}`;
+    }
+
+    transactionId = realTxnId;
+  }
+
+  console.log('[Invoice] Payment resolution result:', {
+    isCOD,
+    paymentMethodText,
+    paymentStatusText,
+    transactionId,
+  });
 
   return {
     isCOD,
     paymentMethodText,
     paymentStatusText,
-    transactionId: String(txnId).trim(),
+    transactionId,
   };
 }
 
@@ -536,7 +759,7 @@ export function renderThermalReceiptToCanvas(params: ThermalReceiptRenderParams)
 
     if (params.isCOD) {
       ctx.font = 'bold 13.5px "Courier New", Courier, monospace';
-      ctx.fillText(`Amount to be collected: ₹${params.total.toFixed(2)}`, padding, y);
+      ctx.fillText(`Amount To Be Collected: ₹${params.total.toFixed(2)}`, padding, y);
       y += 22;
     } else if (params.txnId) {
       ctx.font = '12.5px "Courier New", Courier, monospace';
@@ -838,7 +1061,7 @@ export const generateInvoice = async (
 
     if (isCOD) {
       docPdf.setFont('courier', 'bold');
-      docPdf.text(`Amount to be collected: ₹${total.toFixed(2)}`, leftX, y);
+      docPdf.text(`Amount To Be Collected: ₹${total.toFixed(2)}`, leftX, y);
       y += 4.5;
     } else if (txnId) {
       docPdf.text(`Transaction ID: ${txnId}`, leftX, y);

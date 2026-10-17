@@ -16,6 +16,7 @@ import {
 import {
   normalizeOrderItem,
   useGetOrderCustomerQuery,
+  useGetOrderPaymentQuery,
   useGetOrderQuery,
   useTransitionOrderStatusMutation,
 } from '../../../api/endpoints/ordersApi';
@@ -43,7 +44,7 @@ import type { OrdersStackParamList } from '../../../navigation/types';
 import { DemoModeIndicator } from '../../../components/DemoModeIndicator';
 import { MOCK_CONFIG } from '../../../config/mockConfig';
 import { getMockOrderDetails, type ExtendedOrderDetail } from '../../../mock';
-import { generateInvoice } from '../utils/invoiceGenerator';
+import { extractPaymentDetails, generateInvoice } from '../utils/invoiceGenerator';
 
 type Props = NativeStackScreenProps<
   OrdersStackParamList,
@@ -66,13 +67,13 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [chatVisible, setChatVisible] = useState(false);
-  const [showInvoiceModal, setShowInvoiceModal] = useState<boolean>(false);
+  const [showInvoice, setShowInvoice] = useState<boolean>(false);
 
   const { data: restaurantProfile } = useGetRestaurantProfileQuery();
 
   const handleInvoiceClick = () => {
-    console.log('Invoice button clicked in OrderDetails -> Opening InvoicePreviewModal', order || localOrder);
-    setShowInvoiceModal(true);
+    // When Invoice button clicked, set showInvoice state true immediately with zero delay
+    setShowInvoice(true);
   };
 
   const [toast, setToast] = useState<{
@@ -80,7 +81,7 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
     variant: 'info' | 'success' | 'error' | 'warning';
   } | null>(null);
 
-  const validId = isOrderId(orderId);
+  const validId = Boolean(orderId && orderId !== 'undefined' && orderId !== 'null');
 
   const query = useGetOrderQuery(orderId, {
     skip: !validId,
@@ -108,6 +109,11 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
     MOCK_CONFIG.ENABLE_MOCK_FALLBACK &&
     (!isConnected || query.isError || !apiOrder);
 
+  const paymentQuery = useGetOrderPaymentQuery(orderId, {
+    skip: !validId,
+  });
+  const paymentInfo = paymentQuery.data;
+
   const rawOrder = apiOrder ?? (isUsingMock ? localOrder : undefined);
   const normalized = rawOrder ? (normalizeOrderItem(rawOrder) as ExtendedOrderDetail) : undefined;
   const order: ExtendedOrderDetail | undefined = normalized
@@ -116,8 +122,16 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
         customerName: customerData?.customerName || customerData?.name || normalized.customerName,
         customerPhone: customerData?.customerPhone || customerData?.phone || normalized.customerPhone,
         deliveryAddress: customerData?.deliveryAddress || customerData?.address || normalized.deliveryAddress,
+        paymentMethod: paymentInfo?.paymentMethod || normalized.paymentMethod,
+        paymentMode: paymentInfo?.paymentMode || paymentInfo?.paymentMethod || normalized.paymentMode,
+        isCOD: paymentInfo?.isCOD ?? normalized.isCOD,
+        isCod: paymentInfo?.isCOD ?? normalized.isCod,
+        paymentStatus: paymentInfo?.paymentStatus || normalized.paymentStatus,
+        transactionId: paymentInfo?.transactionId || normalized.transactionId,
       }
     : undefined;
+
+  const paymentDetails = extractPaymentDetails(order, rawOrder, paymentInfo);
 
   const handleError = useApiErrorHandler({
     onToast: (error) => setToast({ message: error.message, variant: 'error' }),
@@ -293,7 +307,33 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
                     />
                   </View>
                 </View>
-                <OrderStatusBadge status={order.status} size="lg" />
+                <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                  <OrderStatusBadge status={order.status} size="lg" />
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      backgroundColor: paymentDetails.isCOD ? '#FEF3C7' : '#DCFCE7',
+                      borderColor: paymentDetails.isCOD ? '#F59E0B' : '#16A34A',
+                      borderWidth: 1,
+                      paddingHorizontal: 8,
+                      paddingVertical: 3,
+                      borderRadius: 6,
+                    }}
+                  >
+                    <Text
+                      variant="caption"
+                      style={{
+                        color: paymentDetails.isCOD ? '#B45309' : '#166534',
+                        fontWeight: 'bold',
+                        fontSize: 11,
+                      }}
+                    >
+                      {paymentDetails.isCOD ? '💵 CASH ON DELIVERY' : `💳 ${paymentDetails.paymentMethodText}`}
+                    </Text>
+                  </View>
+                </View>
               </View>
             </Card>
 
@@ -392,6 +432,93 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
                 <Text variant="heading1" style={{ color: BRAND_ACCENT, fontSize: 24, fontWeight: 'bold' }}>
                   {formatMoney(order.totalAmount)}
                 </Text>
+              </View>
+
+              {/* REAL PAYMENT DETAILS FROM BACKEND */}
+              <View
+                style={{
+                  marginTop: tokens.spacing.xs,
+                  padding: tokens.spacing.sm,
+                  borderRadius: 8,
+                  backgroundColor: paymentDetails.isCOD ? '#FFFBEB' : '#F0FDF4',
+                  borderWidth: 1,
+                  borderColor: paymentDetails.isCOD ? '#FDE68A' : '#BBF7D0',
+                  gap: 4,
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text variant="caption" style={{ fontWeight: '600', color: tokens.color.textSecondary }}>
+                    Payment Method
+                  </Text>
+                  <Text
+                    variant="label"
+                    style={{
+                      fontWeight: 'bold',
+                      color: paymentDetails.isCOD ? '#B45309' : '#166534',
+                      fontSize: 13,
+                    }}
+                  >
+                    {paymentDetails.paymentMethodText}
+                  </Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text variant="caption" style={{ fontWeight: '600', color: tokens.color.textSecondary }}>
+                    Payment Status
+                  </Text>
+                  <Text
+                    variant="label"
+                    style={{
+                      fontWeight: 'bold',
+                      color: paymentDetails.isCOD ? '#D97706' : '#15803D',
+                      fontSize: 12,
+                    }}
+                  >
+                    {paymentDetails.paymentStatusText}
+                  </Text>
+                </View>
+
+                {paymentDetails.isCOD ? (
+                  <View
+                    style={{
+                      marginTop: 4,
+                      paddingTop: 4,
+                      borderTopWidth: 1,
+                      borderTopColor: '#FDE68A',
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text variant="caption" style={{ fontWeight: 'bold', color: '#92400E' }}>
+                      💵 Amount To Be Collected:
+                    </Text>
+                    <Text variant="label" style={{ fontWeight: 'bold', color: '#B45309', fontSize: 15 }}>
+                      ₹{Number(order.totalAmount || 0).toFixed(2)}
+                    </Text>
+                  </View>
+                ) : (
+                  paymentDetails.transactionId ? (
+                    <View
+                      style={{
+                        marginTop: 4,
+                        paddingTop: 4,
+                        borderTopWidth: 1,
+                        borderTopColor: '#BBF7D0',
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Text variant="caption" style={{ color: '#166534', fontWeight: '600' }}>
+                        Transaction ID:
+                      </Text>
+                      <Text variant="caption" style={{ color: '#14532D', fontFamily: 'monospace', fontWeight: 'bold' }}>
+                        {paymentDetails.transactionId}
+                      </Text>
+                    </View>
+                  ) : null
+                )}
               </View>
             </Card>
 
@@ -501,8 +628,8 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
 
       {/* INVOICE PREVIEW MODAL */}
       <InvoicePreviewModal
-        visible={showInvoiceModal}
-        onClose={() => setShowInvoiceModal(false)}
+        visible={showInvoice}
+        onClose={() => setShowInvoice(false)}
         order={order || localOrder}
         restaurantProfile={restaurantProfile}
       />

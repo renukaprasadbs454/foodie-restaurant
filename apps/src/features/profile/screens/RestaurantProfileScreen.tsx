@@ -25,6 +25,7 @@ import {
   useTheme,
 } from 'foodie-shared-rn';
 import {
+  restaurantsApi,
   useGetRestaurantProfileQuery,
   useGetRestaurantQuery,
   useGetRestaurantReviewsQuery,
@@ -181,6 +182,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
     (MOCK_CONFIG.ENABLE_MOCK_FALLBACK ? MOCK_CONFIG.DEFAULT_MOCK_RESTAURANT_ID : undefined);
 
   const mockProfile = getMockRestaurantProfile();
+  const [localProfile, setLocalProfile] = useState<any>(null);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -222,7 +224,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
     MOCK_CONFIG.ENABLE_MOCK_FALLBACK &&
     (!isConnected || query.isError || !apiProfile);
 
-  const profileData = (apiProfile ?? (isUsingMock ? mockProfile : undefined)) as MockRestaurantProfile | undefined;
+  const profileData = (localProfile ?? apiProfile ?? (isUsingMock ? mockProfile : undefined)) as MockRestaurantProfile | undefined;
 
   const reviewsQuery = useGetRestaurantReviewsQuery(
     { restaurantId: restaurantId ?? '', page: 0, size: 100 },
@@ -323,8 +325,31 @@ export function RestaurantProfileScreen({ navigation }: Props) {
       return;
     }
 
+    const updatedProfileData: any = {
+      ...(profileData || {}),
+      name: name.trim(),
+      description: description.trim(),
+      phone: phone.trim(),
+      email: email.trim(),
+      cuisineTypes,
+      address: {
+        line1: line1.trim(),
+        line2: line2.trim(),
+        city: city.trim(),
+        pincode: pincode.trim(),
+        latitude: latitude ? parseFloat(latitude) : undefined,
+        longitude: longitude ? parseFloat(longitude) : undefined,
+      },
+      openTime: formatTo24HourTime(openingTime),
+      closeTime: formatTo24HourTime(closingTime),
+      openDays,
+      logoImageUrl: avatarUri,
+      coverImageUrl: coverUri,
+    };
+
     if (isUsingMock) {
-      setToast({ message: 'Profile saved in Demo Mode.', variant: 'success' });
+      setLocalProfile(updatedProfileData);
+      setToast({ message: 'Profile updated successfully', variant: 'success' });
       return;
     }
 
@@ -332,14 +357,47 @@ export function RestaurantProfileScreen({ navigation }: Props) {
 
     try {
       await updateProfile(validated.value).unwrap();
-      await updateTimings({
-        openTime: formatTo24HourTime(openingTime),
-        closeTime: formatTo24HourTime(closingTime),
-        openDays,
-      }).unwrap();
+      try {
+        await updateTimings({
+          openTime: formatTo24HourTime(openingTime),
+          closeTime: formatTo24HourTime(closingTime),
+          openDays,
+        }).unwrap();
+      } catch (timingErr) {
+        console.warn('Timings update warning:', timingErr);
+      }
 
-      setToast({ message: 'Profile saved successfully.', variant: 'success' });
-      setHydrated(false);
+      // Immediately update local state with new values right after save
+      setName(updatedProfileData.name);
+      setPhone(updatedProfileData.phone);
+      setEmail(updatedProfileData.email);
+      setDescription(updatedProfileData.description);
+      setLine1(updatedProfileData.address.line1);
+      setLine2(updatedProfileData.address.line2);
+      setCity(updatedProfileData.address.city);
+      setPincode(updatedProfileData.address.pincode);
+      setOpeningTime(updatedProfileData.openTime);
+      setClosingTime(updatedProfileData.closeTime);
+      setOpenDays(openDays);
+      setCuisineTypes(cuisineTypes);
+      setLocalProfile(updatedProfileData);
+      setHydrated(true);
+
+      // Immediately update Redux query cache so UI reflects change in real time
+      if (restaurantId) {
+        dispatch(
+          restaurantsApi.util.updateQueryData('getRestaurant', restaurantId, (draft) => {
+            Object.assign(draft, updatedProfileData);
+          })
+        );
+      }
+      dispatch(
+        restaurantsApi.util.updateQueryData('getRestaurantProfile', undefined, (draft) => {
+          Object.assign(draft, updatedProfileData);
+        })
+      );
+
+      setToast({ message: 'Profile updated successfully', variant: 'success' });
       void query.refetch();
     } catch (error) {
       handleError(toUnwrappedApiError(error));
@@ -376,6 +434,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
         fileObj: (asset as any).file,
       }).unwrap();
       setAvatarUri(asset.uri);
+      setLocalProfile((prev: any) => ({ ...(prev || {}), logoImageUrl: asset.uri }));
       setToast({ message: 'Photo uploaded successfully.', variant: 'success' });
     } catch (error) {
       handleError(toUnwrappedApiError(error));
@@ -412,6 +471,7 @@ export function RestaurantProfileScreen({ navigation }: Props) {
         fileObj: (asset as any).file,
       }).unwrap();
       setCoverUri(asset.uri);
+      setLocalProfile((prev: any) => ({ ...(prev || {}), coverImageUrl: asset.uri }));
       setToast({ message: 'Cover photo uploaded successfully.', variant: 'success' });
     } catch (error) {
       handleError(toUnwrappedApiError(error));

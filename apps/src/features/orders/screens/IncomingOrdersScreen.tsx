@@ -91,16 +91,16 @@ export function IncomingOrdersScreen({ navigation }: Props) {
   const [forcePickedUpIds, setForcePickedUpIds] = useState<string[]>([]);
 
   // Invoice preview modal state
-  const [showInvoiceModal, setShowInvoiceModal] = useState<boolean>(false);
+  const [showInvoice, setShowInvoice] = useState<boolean>(false);
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<any | null>(null);
 
   const { data: restaurantProfile } = useGetRestaurantProfileQuery();
 
   const handleInvoiceClick = (targetOrder: any) => {
-    console.log('Invoice button clicked -> Opening InvoicePreviewModal', targetOrder);
-    const normalized = normalizeOrderItem(targetOrder);
-    setSelectedInvoiceOrder({ ...targetOrder, ...normalized });
-    setShowInvoiceModal(true);
+    // Set showInvoice state true immediately with zero delay
+    setShowInvoice(true);
+    const normalized = targetOrder ? normalizeOrderItem(targetOrder) : null;
+    setSelectedInvoiceOrder(normalized ? { ...targetOrder, ...normalized } : targetOrder);
   };
 
   // Local state for demo mode transitions
@@ -606,9 +606,9 @@ export function IncomingOrdersScreen({ navigation }: Props) {
 
       {/* INVOICE PREVIEW MODAL */}
       <InvoicePreviewModal
-        visible={showInvoiceModal}
+        visible={showInvoice}
         onClose={() => {
-          setShowInvoiceModal(false);
+          setShowInvoice(false);
           setSelectedInvoiceOrder(null);
         }}
         order={selectedInvoiceOrder}

@@ -11,6 +11,7 @@ import { Modal } from 'foodie-shared-rn';
 import { OrderChat } from './OrderChat';
 import { isTerminalOrderStatus } from '../types';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
+import { extractPaymentDetails } from '../utils/invoiceGenerator';
 
 type Props = {
   order: OrderSummary;
@@ -40,7 +41,7 @@ export function OrderCard({
   const { tokens } = useTheme();
   const [chatVisible, setChatVisible] = React.useState(false);
   const [locallyMarkedReady, setLocallyMarkedReady] = React.useState(false);
-  const [localShowInvoiceModal, setLocalShowInvoiceModal] = React.useState(false);
+  const [showInvoice, setShowInvoice] = React.useState(false);
   const [localSelectedOrder, setLocalSelectedOrder] = React.useState<any>(null);
 
   const { data: restaurantProfile } = useGetRestaurantProfileQuery();
@@ -49,7 +50,7 @@ export function OrderCard({
     if (e && typeof e.stopPropagation === 'function') {
       e.stopPropagation();
     }
-    console.log('Invoice button clicked -> Opening Preview', order);
+    console.log('Invoice button clicked -> Opening Preview immediately', order);
     const rawDetail = (detail as any)?.data ?? detail;
     const normalizedDetail = rawDetail ? normalizeOrderItem(rawDetail) : null;
     const normalizedOrder = normalizeOrderItem(order);
@@ -64,8 +65,11 @@ export function OrderCard({
           customerPhone: normalizedDetail.customerPhone || normalizedOrder.customerPhone,
           deliveryAddress: normalizedDetail.deliveryAddress || normalizedOrder.deliveryAddress,
           paymentMethod: normalizedDetail.paymentMethod || normalizedOrder.paymentMethod,
-          paymentStatus: normalizedDetail.paymentStatus || normalizedOrder.paymentStatus,
-          transactionId: normalizedDetail.transactionId || normalizedOrder.transactionId,
+          paymentMode: (normalizedDetail as any).paymentMode || (normalizedOrder as any).paymentMode,
+          isCOD: isCOD || Boolean((normalizedDetail as any)?.isCOD || (normalizedOrder as any)?.isCOD),
+          isCod: isCOD || Boolean((normalizedDetail as any)?.isCod || (normalizedOrder as any)?.isCod),
+          paymentStatus: isCOD ? 'PENDING' : (normalizedDetail.paymentStatus || normalizedOrder.paymentStatus || 'PAID'),
+          transactionId: isCOD ? undefined : (normalizedDetail.transactionId || normalizedOrder.transactionId),
           items: (normalizedDetail.items && normalizedDetail.items.length > 0) ? normalizedDetail.items : normalizedOrder.items,
         }
       : normalizedOrder;
@@ -75,7 +79,7 @@ export function OrderCard({
       return;
     }
     setLocalSelectedOrder(fullOrder);
-    setLocalShowInvoiceModal(true);
+    setShowInvoice(true);
   };
 
   // Optionally fetch full OrderDetail for line items breakdown if available
@@ -89,6 +93,8 @@ export function OrderCard({
   const isPending = ['CONFIRMED', 'PENDING', 'PLACED'].includes(status);
   const hasBeenMarkedReady = detail?.orderStatusEvents?.some((e: any) => e.toStatus === 'READY_FOR_PICKUP') ?? false;
   const actions = restaurantActionsForStatus(status);
+  const paymentDetails = extractPaymentDetails(order, detail);
+  const isCOD = paymentDetails.isCOD;
 
   return (
     <Card
@@ -162,7 +168,30 @@ export function OrderCard({
           </Text>
         </View>
 
-        <OrderStatusBadge status={status} size="md" />
+        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+          <OrderStatusBadge status={status} size="md" />
+          <View
+            style={{
+              backgroundColor: isCOD ? '#FEF3C7' : '#DCFCE7',
+              borderColor: isCOD ? '#F59E0B' : '#16A34A',
+              borderWidth: 1,
+              paddingHorizontal: 6,
+              paddingVertical: 2,
+              borderRadius: 4,
+            }}
+          >
+            <Text
+              variant="caption"
+              style={{
+                color: isCOD ? '#B45309' : '#166534',
+                fontWeight: 'bold',
+                fontSize: 10,
+              }}
+            >
+              {isCOD ? '💵 COD' : `💳 ${paymentDetails.paymentMethodText}`}
+            </Text>
+          </View>
+        </View>
       </View>
 
       {/* ORDER ITEMS SUMMARY */}
@@ -223,6 +252,46 @@ export function OrderCard({
             {detail ? formatMoney(detail.subtotal) : formatMoney(order.totalAmount)}
           </Text>
         </View>
+
+        {isCOD ? (
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginTop: 2,
+              paddingTop: 3,
+              borderTopWidth: 1,
+              borderTopColor: '#FDE68A',
+            }}
+          >
+            <Text variant="caption" style={{ color: '#B45309', fontWeight: 'bold', fontSize: 11 }}>
+              💵 To Collect (COD):
+            </Text>
+            <Text variant="caption" style={{ color: '#B45309', fontWeight: 'bold', fontSize: 12 }}>
+              ₹{Number(detail?.totalAmount ?? order.totalAmount ?? detail?.subtotal ?? 0).toFixed(2)}
+            </Text>
+          </View>
+        ) : (
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginTop: 2,
+              paddingTop: 3,
+              borderTopWidth: 1,
+              borderTopColor: '#BBF7D0',
+            }}
+          >
+            <Text variant="caption" style={{ color: '#166534', fontWeight: '600', fontSize: 11 }}>
+              Payment:
+            </Text>
+            <Text variant="caption" style={{ color: '#15803D', fontWeight: 'bold', fontSize: 11 }}>
+              {paymentDetails.paymentMethodText} ({paymentDetails.paymentStatusText})
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* ACTION BUTTONS: CHAT & INVOICE */}
@@ -260,8 +329,8 @@ export function OrderCard({
       </View>
 
       <InvoicePreviewModal
-        visible={localShowInvoiceModal}
-        onClose={() => setLocalShowInvoiceModal(false)}
+        visible={showInvoice}
+        onClose={() => setShowInvoice(false)}
         order={localSelectedOrder || (detail ? { ...order, ...detail } : order)}
         restaurantProfile={restaurantProfile}
       />

@@ -10,7 +10,11 @@ import {
 } from 'react-native';
 import { Button, Text, useTheme } from 'foodie-shared-rn';
 import JsBarcode from 'jsbarcode';
-import { useGetOrderCustomerQuery, useGetOrderQuery } from '../../../api/endpoints/ordersApi';
+import {
+  useGetOrderCustomerQuery,
+  useGetOrderPaymentQuery,
+  useGetOrderQuery,
+} from '../../../api/endpoints/ordersApi';
 import { useGetUserByIdQuery } from '../../../api/endpoints/usersApi';
 import {
   extractAddressString,
@@ -41,13 +45,27 @@ export function InvoicePreviewModal({
   const [barcodeDataUrl, setBarcodeDataUrl] = useState<string>('');
 
   // 1. Dynamic Order ID & Real Barcode value (Changes for every order)
-  const lookupOrderId = String(order?.orderId || order?.id || order?.orderNumber || '').replace(/^#/, '');
+  const lookupOrderId = String(
+    (order?.orderId && !String(order.orderId).startsWith('#') ? order.orderId : undefined) ||
+    (order?.id && !String(order.id).startsWith('#') ? order.id : undefined) ||
+    order?.orderId ||
+    order?.id ||
+    order?.orderNumber ||
+    ''
+  ).replace(/^#/, '').trim();
 
   // Fetch full live order details if available
   const orderDetailsQuery = useGetOrderQuery(lookupOrderId, {
     skip: !visible || !lookupOrderId,
   });
   const detail = orderDetailsQuery.data;
+
+  // Resolve best order ID to query payment info: prioritize clean database ID
+  const paymentLookupId = String(
+    (detail?.orderId && !String(detail.orderId).startsWith('#') ? detail.orderId : undefined) ||
+    (detail?.id && !String(detail.id).startsWith('#') ? detail.id : undefined) ||
+    lookupOrderId
+  ).replace(/^#/, '').trim();
 
   // Fetch customer contact details for this order
   const orderCustomerQuery = useGetOrderCustomerQuery(lookupOrderId, {
@@ -68,9 +86,25 @@ export function InvoicePreviewModal({
   });
   const userData = userQuery.data;
 
+  // Fetch real payment details directly from backend
+  const orderPaymentQuery = useGetOrderPaymentQuery(paymentLookupId, {
+    skip: !visible || !paymentLookupId,
+  });
+  const paymentInfo = orderPaymentQuery.data;
+
+  // Resolve dynamic payment method, status, COD flag, and transaction ID
+  const { isCOD, paymentMethodText, paymentStatusText, transactionId: txnId } =
+    extractPaymentDetails(order, detail, paymentInfo);
+
   const activeOrder = {
     ...order,
     ...(detail || {}),
+    paymentMethod: paymentMethodText,
+    paymentMode: paymentMethodText,
+    isCOD,
+    isCod: isCOD,
+    paymentStatus: paymentStatusText,
+    transactionId: txnId,
   };
 
   const { barcodeValue, displayOrderId } = extractBarcodeValue(activeOrder);
@@ -101,23 +135,68 @@ export function InvoicePreviewModal({
     }
   }, [visible, barcodeValue]);
 
-  if (!visible || !order) {
+  const modalBoxRef = React.useRef<any>(null);
+
+  // Autofocus modal and prevent background scroll
+  useEffect(() => {
+    if (visible && Platform.OS === 'web' && typeof document !== 'undefined') {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+
+      // Autofocus
+      const focusTimer = setTimeout(() => {
+        if (modalBoxRef.current) {
+          if (typeof modalBoxRef.current.focus === 'function') {
+            modalBoxRef.current.focus();
+          } else if (modalBoxRef.current.node && typeof modalBoxRef.current.node.focus === 'function') {
+            modalBoxRef.current.node.focus();
+          }
+        }
+      }, 0);
+
+      return () => {
+        clearTimeout(focusTimer);
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [visible]);
+
+  // Close instantly on Escape key
+  useEffect(() => {
+    if (!visible) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', handleKeyDown, true);
+      return () => {
+        window.removeEventListener('keydown', handleKeyDown, true);
+      };
+    }
+  }, [visible, onClose]);
+
+  if (!visible) {
     return null;
   }
+
+  const targetOrder = order || {};
 
   // 2. HOTEL / RESTAURANT DETAILS (WITH [object Object] FIX)
   const restData = restaurantProfile || {};
   const restaurantName =
-    order.restaurantName ||
-    order.restaurant?.name ||
+    targetOrder.restaurantName ||
+    targetOrder.restaurant?.name ||
     restData.name ||
     restData.legalName ||
     'DELIMO Restaurant';
 
   const rawRestAddr =
-    order.restaurantAddress ||
-    order.restaurant?.address ||
-    order.restaurant?.formattedAddress ||
+    targetOrder.restaurantAddress ||
+    targetOrder.restaurant?.address ||
+    targetOrder.restaurant?.formattedAddress ||
     restData.address ||
     restData.formattedAddress ||
     restData.registeredAddressLine1;
@@ -133,59 +212,58 @@ export function InvoicePreviewModal({
   }
 
   const restaurantPhone =
-    order.restaurantPhone ||
-    order.restaurant?.phone ||
+    targetOrder.restaurantPhone ||
+    targetOrder.restaurant?.phone ||
     restData.phone ||
     restData.businessPhone ||
     '+91 98765 43210';
 
   // 3. 100% DYNAMIC CUSTOMER DETAILS (NO HARDCODED FALLBACKS)
   const combinedCustomerOrder = {
-    ...order,
+    ...targetOrder,
     ...(detail || {}),
     customerName:
       orderCustomer?.customerName ||
       orderCustomer?.name ||
-      order.customerName ||
-      order.customer_name ||
+      targetOrder.customerName ||
+      targetOrder.customer_name ||
       (detail as any)?.customerName ||
       userData?.name ||
       userData?.fullName ||
       userData?.displayName ||
-      (typeof order.deliveryAddress === 'object' ? order.deliveryAddress?.name || order.deliveryAddress?.recipientName : undefined) ||
+      (typeof targetOrder.deliveryAddress === 'object' ? targetOrder.deliveryAddress?.name || targetOrder.deliveryAddress?.recipientName : undefined) ||
       (typeof (detail as any)?.deliveryAddress === 'object' ? (detail as any)?.deliveryAddress?.name || (detail as any)?.deliveryAddress?.recipientName : undefined),
     customerPhone:
       orderCustomer?.customerPhone ||
       orderCustomer?.phone ||
-      order.customerPhone ||
-      order.customer_phone ||
+      targetOrder.customerPhone ||
+      targetOrder.customer_phone ||
       (detail as any)?.customerPhone ||
       userData?.phone ||
       userData?.phoneNumber ||
-      (typeof order.deliveryAddress === 'object' ? order.deliveryAddress?.phone || order.deliveryAddress?.phoneNumber || order.deliveryAddress?.recipientPhone : undefined) ||
+      (typeof targetOrder.deliveryAddress === 'object' ? targetOrder.deliveryAddress?.phone || targetOrder.deliveryAddress?.phoneNumber || targetOrder.deliveryAddress?.recipientPhone : undefined) ||
       (typeof (detail as any)?.deliveryAddress === 'object' ? (detail as any)?.deliveryAddress?.phone || (detail as any)?.deliveryAddress?.phoneNumber || (detail as any)?.deliveryAddress?.recipientPhone : undefined),
     deliveryAddress:
       orderCustomer?.deliveryAddress ||
       orderCustomer?.address ||
       (detail as any)?.deliveryAddress ||
-      order.deliveryAddress,
+      targetOrder.deliveryAddress,
   };
 
   const { name: customerName, phone: customerPhone } = extractCustomerDetails(combinedCustomerOrder);
 
   // 4. ITEMS LIST (Dynamic: from live detail or order)
-  const rawItems = (detail as any)?.items && (detail as any).items.length > 0 ? (detail as any).items : order.items;
+  const rawItems = (detail as any)?.items && (detail as any).items.length > 0 ? (detail as any).items : targetOrder.items;
   const items = Array.isArray(rawItems) ? rawItems : [];
 
   // 5. AMOUNTS (Subtotal & TOTAL with ₹ only)
-  const subtotal = Number((detail as any)?.subtotal ?? order.subtotal ?? (detail as any)?.totalAmount ?? order.totalAmount ?? order.total ?? 0);
-  const total = Number((detail as any)?.totalAmount ?? order.totalAmount ?? (detail as any)?.total ?? order.total ?? subtotal);
+  const subtotal = Number((detail as any)?.subtotal ?? targetOrder.subtotal ?? (detail as any)?.totalAmount ?? targetOrder.totalAmount ?? targetOrder.total ?? 0);
+  const total = Number((detail as any)?.totalAmount ?? targetOrder.totalAmount ?? (detail as any)?.total ?? targetOrder.total ?? subtotal);
 
-  // 6. 100% DYNAMIC PAYMENT METHOD & STATUS (Checks order and live detail)
-  const { isCOD, paymentMethodText, paymentStatusText, transactionId: txnId } = extractPaymentDetails(order, detail);
+  // 6. DYNAMIC PAYMENT METHOD & STATUS (Already resolved accurately above via extractPaymentDetails)
 
   // 7. DATE
-  const rawDate = order.createdAt || order.placedAt || new Date().toISOString();
+  const rawDate = targetOrder.createdAt || targetOrder.placedAt || new Date().toISOString();
   let formattedDate = '';
   try {
     const d = new Date(rawDate);
@@ -302,7 +380,7 @@ export function InvoicePreviewModal({
               <div class="divider"></div>
               <div>Payment Method: ${paymentMethodText}</div>
               <div>Payment Status: <b>${paymentStatusText}</b></div>
-              ${isCOD ? `<div class="bold">Amount to be collected: ₹${total.toFixed(2)}</div>` : txnId ? `<div>Transaction ID: ${txnId}</div>` : ''}
+              ${isCOD ? `<div class="bold">Amount To Be Collected: ₹${total.toFixed(2)}</div>` : txnId ? `<div>Transaction ID: ${txnId}</div>` : ''}
               <div class="divider"></div>
               <div class="center bold">Thank you for ordering with DELIMO!</div>
               ${barcodeDataUrl ? `<img src="${barcodeDataUrl}" class="barcode-img" alt="Barcode" />` : `<div class="center bold">*${barcodeValue}*</div>`}
@@ -322,9 +400,24 @@ export function InvoicePreviewModal({
   };
 
   const content = (
-    <View style={styles.modalBackdrop}>
-      <Pressable style={styles.backdropPressable} onPress={onClose} />
-      <View style={styles.dialogCard}>
+    <View
+      style={styles.modalContainer}
+      testID="invoice-modal-container"
+    >
+      <Pressable
+        style={styles.backdropPressable}
+        onPress={onClose}
+        accessibilityLabel="Close modal backdrop"
+      />
+      <View
+        ref={modalBoxRef}
+        focusable={true}
+        tabIndex={-1}
+        aria-modal={true}
+        role="dialog"
+        accessibilityRole="alert"
+        style={styles.dialogCard}
+      >
         {/* MODAL TOP HEADER */}
         <View style={styles.modalHeader}>
           <View>
@@ -467,7 +560,7 @@ export function InvoicePreviewModal({
 
               {isCOD ? (
                 <Text style={[styles.receiptMonoText, styles.receiptBold, { marginTop: 4 }]}>
-                  Amount to be collected: ₹{total.toFixed(2)}
+                  Amount To Be Collected: ₹{total.toFixed(2)}
                 </Text>
               ) : txnId ? (
                 <Text style={[styles.receiptMonoText, { marginTop: 4 }]}>
@@ -529,15 +622,22 @@ export function InvoicePreviewModal({
     </View>
   );
 
-  if (Platform.OS === 'web') {
-    return content;
+  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    try {
+      const ReactDOM = require('react-dom');
+      if (ReactDOM && typeof ReactDOM.createPortal === 'function') {
+        return ReactDOM.createPortal(content, document.body);
+      }
+    } catch (e) {
+      console.warn('[InvoicePreviewModal] Portal fallback:', e);
+    }
   }
 
   return (
     <Modal
       visible={visible}
       onRequestClose={onClose}
-      animationType="fade"
+      animationType="none"
       transparent={true}
     >
       {content}
@@ -546,28 +646,44 @@ export function InvoicePreviewModal({
 }
 
 const styles = StyleSheet.create({
+  modalContainer: {
+    position: 'fixed' as any,
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    zIndex: 9999,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
   modalBackdrop: {
-    ...(Platform.OS === 'web'
-      ? ({
-          position: 'fixed' as any,
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 99999,
-        } as any)
-      : {
-          flex: 1,
-        }),
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    position: 'fixed' as any,
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    zIndex: 9999,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
   },
   backdropPressable: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
   },
   dialogCard: {
+    position: 'relative' as any,
+    zIndex: 10000,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
@@ -579,7 +695,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 20,
     elevation: 10,
-    zIndex: 1,
     display: 'flex',
     flexDirection: 'column',
   },
