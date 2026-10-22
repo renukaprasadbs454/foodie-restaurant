@@ -338,6 +338,8 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
     if (matchedZone) {
       const finalPayload = {
         ...validated.value,
+        zoneId: matchedZone.id,
+        zoneName: matchedZone.zoneName,
         address: {
           ...validated.value.address,
           city: matchedZone.cityName

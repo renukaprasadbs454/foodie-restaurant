@@ -131,11 +131,12 @@ export function OrderCard({
           paddingBottom: tokens.spacing.xs,
         }}
       >
-        <View style={{ gap: 2 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View style={{ flex: 1, gap: 2, marginRight: tokens.spacing.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <Text
               variant="label"
-              style={{ fontSize: 17, color: BRAND_PRIMARY, fontWeight: 'bold' }}
+              style={{ fontSize: 16, color: BRAND_PRIMARY, fontWeight: 'bold' }}
+              numberOfLines={1}
             >
               {order.orderNumber}
             </Text>
@@ -158,17 +159,22 @@ export function OrderCard({
             ) : null}
           </View>
 
-          <Text variant="caption" color={tokens.color.textSecondary}>
+          <Text
+            variant="caption"
+            color={tokens.color.textSecondary}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
             👤 Customer: {detail?.customerName || order.customerName || 'Customer'}
             {(detail?.customerPhone || order.customerPhone) ? ` • 📞 ${detail?.customerPhone || order.customerPhone}` : ''}
           </Text>
 
-          <Text variant="caption" color={tokens.color.textSecondary}>
+          <Text variant="caption" color={tokens.color.textSecondary} numberOfLines={1}>
             🕒 {order.placedAt ? new Date(order.placedAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : 'Recent'}
           </Text>
         </View>
 
-        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+        <View style={{ alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
           <OrderStatusBadge status={status} size="md" />
           <View
             style={{
@@ -252,46 +258,6 @@ export function OrderCard({
             {detail ? formatMoney(detail.subtotal) : formatMoney(order.totalAmount)}
           </Text>
         </View>
-
-        {isCOD ? (
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginTop: 2,
-              paddingTop: 3,
-              borderTopWidth: 1,
-              borderTopColor: '#FDE68A',
-            }}
-          >
-            <Text variant="caption" style={{ color: '#B45309', fontWeight: 'bold', fontSize: 11 }}>
-              💵 To Collect (COD):
-            </Text>
-            <Text variant="caption" style={{ color: '#B45309', fontWeight: 'bold', fontSize: 12 }}>
-              ₹{Number(detail?.totalAmount ?? order.totalAmount ?? detail?.subtotal ?? 0).toFixed(2)}
-            </Text>
-          </View>
-        ) : (
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginTop: 2,
-              paddingTop: 3,
-              borderTopWidth: 1,
-              borderTopColor: '#BBF7D0',
-            }}
-          >
-            <Text variant="caption" style={{ color: '#166534', fontWeight: '600', fontSize: 11 }}>
-              Payment:
-            </Text>
-            <Text variant="caption" style={{ color: '#15803D', fontWeight: 'bold', fontSize: 11 }}>
-              {paymentDetails.paymentMethodText} ({paymentDetails.paymentStatusText})
-            </Text>
-          </View>
-        )}
       </View>
 
       {/* ACTION BUTTONS: CHAT & INVOICE */}

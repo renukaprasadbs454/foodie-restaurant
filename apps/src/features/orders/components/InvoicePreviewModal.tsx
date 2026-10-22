@@ -161,7 +161,7 @@ export function InvoicePreviewModal({
     }
   }, [visible]);
 
-  // Close instantly on Escape key
+  // Close instantly on Escape key (Web only)
   useEffect(() => {
     if (!visible) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -170,10 +170,12 @@ export function InvoicePreviewModal({
         onClose();
       }
     };
-    if (typeof window !== 'undefined') {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
       window.addEventListener('keydown', handleKeyDown, true);
       return () => {
-        window.removeEventListener('keydown', handleKeyDown, true);
+        if (typeof window.removeEventListener === 'function') {
+          window.removeEventListener('keydown', handleKeyDown, true);
+        }
       };
     }
   }, [visible, onClose]);
@@ -647,9 +649,11 @@ export function InvoicePreviewModal({
 
 const styles = StyleSheet.create({
   modalContainer: {
-    position: 'fixed' as any,
+    position: (Platform.OS === 'web' ? 'fixed' : 'absolute') as any,
     top: 0,
     left: 0,
+    right: 0,
+    bottom: 0,
     width: '100%',
     height: '100%',
     zIndex: 9999,
@@ -660,9 +664,11 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   modalBackdrop: {
-    position: 'fixed' as any,
+    position: (Platform.OS === 'web' ? 'fixed' : 'absolute') as any,
     top: 0,
     left: 0,
+    right: 0,
+    bottom: 0,
     width: '100%',
     height: '100%',
     zIndex: 9999,

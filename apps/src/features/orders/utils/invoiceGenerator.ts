@@ -1,4 +1,4 @@
-import jsPDF from 'jspdf';
+import type jsPDF from 'jspdf';
 import JsBarcode from 'jsbarcode';
 
 export type InvoiceResult = {
@@ -825,7 +825,14 @@ export const generateInvoice = async (
 ): Promise<InvoiceResult> => {
   console.log('[Invoice] Generating invoice for order:', order);
 
-  const JsPdfClass = (jsPDF as any)?.jsPDF || jsPDF;
+  let JsPdfClass: any;
+  try {
+    const jspdfModule = require('jspdf');
+    JsPdfClass = jspdfModule?.default?.jsPDF || jspdfModule?.jsPDF || jspdfModule?.default || jspdfModule;
+  } catch (err) {
+    console.warn('[Invoice] jspdf could not be loaded dynamically:', err);
+    throw new Error('PDF generation is not supported on this platform');
+  }
 
   // Order ID for barcode & filename (100% Dynamic)
   const { barcodeValue, displayOrderId } = extractBarcodeValue(order);

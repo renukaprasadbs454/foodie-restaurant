@@ -44,6 +44,8 @@ export type RegisterRestaurantRequest = {
   description?: string | null;
   cuisineTypes: string[];
   restaurantType?: RestaurantCategoryType;
+  zoneId?: string;
+  zoneName?: string;
   address: RestaurantAddress;
 };
 
