@@ -578,15 +578,11 @@ export function renderThermalReceiptToCanvas(params: ThermalReceiptRenderParams)
     estHeight += 22; // Customer Name
     estHeight += 22; // Customer Phone
     estHeight += 24; // Divider
-    estHeight += itemsCount * 24; // Items
-    estHeight += 24; // Divider
-    estHeight += 22; // Subtotal
-    estHeight += 30; // TOTAL
+    estHeight += itemsCount * 22; // Items
     estHeight += 24; // Divider
     estHeight += 20; // Payment Method
     estHeight += 20; // Payment Status
-    if (params.isCOD) estHeight += 26; // Amount to be collected
-    else if (params.txnId) estHeight += 22; // Txn ID
+    if (!params.isCOD && params.txnId) estHeight += 22; // Txn ID
     estHeight += 24; // Divider
     estHeight += 26; // Thank you
     estHeight += 95; // Barcode + text + margin
@@ -664,86 +660,35 @@ export function renderThermalReceiptToCanvas(params: ThermalReceiptRenderParams)
     // Divider
     drawDashedDivider();
 
-    // 7. Items
+    // 7. Items (without prices)
     if (params.items.length > 0) {
       for (const item of params.items) {
         const qty = Number(item.quantity || 1);
-        const price = Number(item.price ?? item.unitPrice ?? 0);
-        const lineTotal = item.lineTotal != null ? Number(item.lineTotal) : price * qty;
         const name = String(item.foodName || item.name || 'Food Item').toUpperCase();
-
         const leftText = `${qty} x ${name}`;
-        const rightText = `₹${lineTotal.toFixed(2)}`;
 
-        ctx.font = '12.5px "Courier New", Courier, monospace';
+        ctx.font = 'bold 13px "Courier New", Courier, monospace';
         ctx.textAlign = 'left';
 
-        // Measure right text width
-        const rightWidth = ctx.measureText(rightText).width;
-        const maxLeftWidth = printableWidth - rightWidth - 20;
-
         let displayLeft = leftText;
-        while (ctx.measureText(displayLeft).width > maxLeftWidth && displayLeft.length > 5) {
+        while (ctx.measureText(displayLeft).width > printableWidth && displayLeft.length > 5) {
           displayLeft = displayLeft.slice(0, -4) + '...';
         }
 
         ctx.fillText(displayLeft, padding, y);
-
-        // Leader line of dots
-        const leftWidth = ctx.measureText(displayLeft).width;
-        const dotsStart = padding + leftWidth + 6;
-        const dotsEnd = width - padding - rightWidth - 6;
-
-        if (dotsEnd > dotsStart + 10) {
-          ctx.save();
-          ctx.strokeStyle = '#888888';
-          ctx.lineWidth = 1;
-          ctx.setLineDash([2, 5]);
-          ctx.beginPath();
-          ctx.moveTo(dotsStart, y);
-          ctx.lineTo(dotsEnd, y);
-          ctx.stroke();
-          ctx.restore();
-        }
-
-        ctx.textAlign = 'right';
-        ctx.font = 'bold 12.5px "Courier New", Courier, monospace';
-        ctx.fillText(rightText, width - padding, y);
-
         y += 22;
       }
     } else {
       ctx.textAlign = 'left';
-      ctx.font = '13px "Courier New", Courier, monospace';
-      ctx.fillText('1 x ORDER ITEMS', padding, y);
-      ctx.textAlign = 'right';
       ctx.font = 'bold 13px "Courier New", Courier, monospace';
-      ctx.fillText(`₹${params.total.toFixed(2)}`, width - padding, y);
+      ctx.fillText('1 x ORDER ITEMS', padding, y);
       y += 22;
     }
 
     // Divider
     drawDashedDivider();
 
-    // 8. Subtotal & TOTAL
-    ctx.textAlign = 'left';
-    ctx.font = '13.5px "Courier New", Courier, monospace';
-    ctx.fillText('Subtotal:', padding, y);
-    ctx.textAlign = 'right';
-    ctx.fillText(`₹${params.subtotal.toFixed(2)}`, width - padding, y);
-    y += 24;
-
-    ctx.textAlign = 'left';
-    ctx.font = 'bold 18px "Courier New", Courier, monospace';
-    ctx.fillText('TOTAL:', padding, y);
-    ctx.textAlign = 'right';
-    ctx.fillText(`₹${params.total.toFixed(2)}`, width - padding, y);
-    y += 26;
-
-    // Divider
-    drawDashedDivider();
-
-    // 9. Payment Details
+    // 8. Payment Details
     ctx.textAlign = 'left';
     ctx.font = '13px "Courier New", Courier, monospace';
     ctx.fillText(`Payment Method: ${params.paymentMethodText}`, padding, y);
@@ -757,11 +702,7 @@ export function renderThermalReceiptToCanvas(params: ThermalReceiptRenderParams)
     ctx.restore();
     y += 20;
 
-    if (params.isCOD) {
-      ctx.font = 'bold 13.5px "Courier New", Courier, monospace';
-      ctx.fillText(`Amount To Be Collected: ₹${params.total.toFixed(2)}`, padding, y);
-      y += 22;
-    } else if (params.txnId) {
+    if (!params.isCOD && params.txnId) {
       ctx.font = '12.5px "Courier New", Courier, monospace';
       ctx.fillText(`Transaction ID: ${params.txnId}`, padding, y);
       y += 20;
@@ -1010,47 +951,16 @@ export const generateInvoice = async (
     if (items.length > 0) {
       items.forEach((item: any) => {
         const qty = Number(item.quantity || 1);
-        const unitPrice = Number(item.price ?? item.unitPrice ?? 0);
-        const lineTotal = item.lineTotal != null ? Number(item.lineTotal) : unitPrice * qty;
         const rawFoodName = String(item.foodName || item.name || 'Food Item').toUpperCase();
-
-        const rightPart = ` ₹${lineTotal.toFixed(2)}`;
-        const maxLeftChars = maxLineChars - rightPart.length - 3;
-        let leftPart = `${qty} x ${rawFoodName}`;
-        if (leftPart.length > maxLeftChars) {
-          leftPart = leftPart.slice(0, maxLeftChars - 2) + '..';
-        }
-
-        const dashCount = Math.max(3, maxLineChars - leftPart.length - rightPart.length);
-        const dashes = '-'.repeat(dashCount);
-        const fullLine = `${leftPart} ${dashes}${rightPart}`;
-
-        docPdf.text(fullLine, leftX, y);
-        y += 4;
+        docPdf.setFont('courier', 'bold');
+        docPdf.text(`${qty} x ${rawFoodName}`, leftX, y);
+        y += 4.5;
       });
     } else {
-      const fallbackPrice = ` ₹${total.toFixed(2)}`;
-      const leftPart = '1 x ORDER ITEMS';
-      const dashCount = Math.max(3, maxLineChars - leftPart.length - fallbackPrice.length);
-      const dashes = '-'.repeat(dashCount);
-      docPdf.text(`${leftPart} ${dashes}${fallbackPrice}`, leftX, y);
-      y += 4;
+      docPdf.setFont('courier', 'bold');
+      docPdf.text('1 x ORDER ITEMS', leftX, y);
+      y += 4.5;
     }
-
-    drawDivider();
-
-    docPdf.setFont('courier', 'normal');
-    docPdf.setFontSize(8.5);
-
-    docPdf.text('Subtotal:', leftX, y);
-    docPdf.text(`₹${subtotal.toFixed(2)}`, rightX, y, { align: 'right' });
-    y += 4.5;
-
-    docPdf.setFont('courier', 'bold');
-    docPdf.setFontSize(10);
-    docPdf.text('TOTAL:', leftX, y);
-    docPdf.text(`₹${total.toFixed(2)}`, rightX, y, { align: 'right' });
-    y += 5;
 
     drawDivider();
 
@@ -1066,11 +976,7 @@ export const generateInvoice = async (
     docPdf.setFont('courier', 'normal');
     y += 4;
 
-    if (isCOD) {
-      docPdf.setFont('courier', 'bold');
-      docPdf.text(`Amount To Be Collected: ₹${total.toFixed(2)}`, leftX, y);
-      y += 4.5;
-    } else if (txnId) {
+    if (!isCOD && txnId) {
       docPdf.text(`Transaction ID: ${txnId}`, leftX, y);
       y += 4;
     }

@@ -326,15 +326,13 @@ export function InvoicePreviewModal({
       const itemsHtml =
         items.length > 0
           ? items
-              .map((item: any) => {
-                const qty = Number(item.quantity || 1);
-                const price = Number(item.price ?? item.unitPrice ?? 0);
-                const lineTotal = item.lineTotal != null ? Number(item.lineTotal) : price * qty;
-                const name = String(item.foodName || item.name || 'Food Item').toUpperCase();
-                return `<div class="row"><span>${qty} x ${name}</span><span>₹${lineTotal.toFixed(2)}</span></div>`;
-              })
-              .join('')
-          : `<div class="row"><span>1 x ORDER ITEMS</span><span>₹${total.toFixed(2)}</span></div>`;
+            .map((item: any) => {
+              const qty = Number(item.quantity || 1);
+              const name = String(item.foodName || item.name || 'Food Item').toUpperCase();
+              return `<div class="row bold"><span>${qty} x ${name}</span></div>`;
+            })
+            .join('')
+          : `<div class="row bold"><span>1 x ORDER ITEMS</span></div>`;
 
       printWindow.document.write(`
         <!DOCTYPE html>
@@ -377,12 +375,9 @@ export function InvoicePreviewModal({
               <div class="divider"></div>
               ${itemsHtml}
               <div class="divider"></div>
-              <div class="row"><span>Subtotal:</span><span>₹${subtotal.toFixed(2)}</span></div>
-              <div class="row total-row"><span>TOTAL:</span><span>₹${total.toFixed(2)}</span></div>
-              <div class="divider"></div>
               <div>Payment Method: ${paymentMethodText}</div>
               <div>Payment Status: <b>${paymentStatusText}</b></div>
-              ${isCOD ? `<div class="bold">Amount To Be Collected: ₹${total.toFixed(2)}</div>` : txnId ? `<div>Transaction ID: ${txnId}</div>` : ''}
+              ${!isCOD && txnId ? `<div>Transaction ID: ${txnId}</div>` : ''}
               <div class="divider"></div>
               <div class="center bold">Thank you for ordering with DELIMO!</div>
               ${barcodeDataUrl ? `<img src="${barcodeDataUrl}" class="barcode-img" alt="Barcode" />` : `<div class="center bold">*${barcodeValue}*</div>`}
@@ -487,37 +482,25 @@ export function InvoicePreviewModal({
             {/* 7. HORIZONTAL LINE */}
             <View style={styles.receiptDivider} />
 
-            {/* 8. ORDERED FOOD ITEMS LIST WITH ₹ */}
+            {/* 8. ORDERED FOOD ITEMS LIST (WITHOUT MONEY) */}
             <View style={styles.receiptItemsList}>
               {items.length > 0 ? (
                 items.map((item: any, idx: number) => {
                   const qty = Number(item.quantity || 1);
-                  const price = Number(item.price ?? item.unitPrice ?? 0);
-                  const lineTotal = item.lineTotal != null ? Number(item.lineTotal) : price * qty;
                   const name = String(item.foodName || item.name || 'Food Item').toUpperCase();
 
                   return (
                     <View key={idx} style={styles.receiptItemRow}>
-                      <Text style={[styles.receiptMonoText, { flex: 1 }]} numberOfLines={1}>
+                      <Text style={[styles.receiptMonoText, styles.receiptBold, { flex: 1 }]} numberOfLines={2}>
                         {qty} x {name}
-                      </Text>
-                      <Text style={styles.receiptDashes} numberOfLines={1}>
-                        {' ----------------- '}
-                      </Text>
-                      <Text style={[styles.receiptMonoText, styles.receiptBold]}>
-                        ₹{lineTotal.toFixed(2)}
                       </Text>
                     </View>
                   );
                 })
               ) : (
                 <View style={styles.receiptItemRow}>
-                  <Text style={[styles.receiptMonoText, { flex: 1 }]}>
+                  <Text style={[styles.receiptMonoText, styles.receiptBold, { flex: 1 }]}>
                     1 x ORDER ITEMS
-                  </Text>
-                  <Text style={styles.receiptDashes}>{' ----------------- '}</Text>
-                  <Text style={[styles.receiptMonoText, styles.receiptBold]}>
-                    ₹{total.toFixed(2)}
                   </Text>
                 </View>
               )}
@@ -526,25 +509,7 @@ export function InvoicePreviewModal({
             {/* 9. HORIZONTAL LINE */}
             <View style={styles.receiptDivider} />
 
-            {/* 10. SUBTOTAL & TOTAL WITH ₹ ONLY */}
-            <View style={styles.receiptSummaryBlock}>
-              <View style={styles.receiptRowBetween}>
-                <Text style={styles.receiptMonoText}>Subtotal:</Text>
-                <Text style={styles.receiptMonoText}>₹{subtotal.toFixed(2)}</Text>
-              </View>
-
-              <View style={[styles.receiptRowBetween, styles.receiptTotalRow]}>
-                <Text style={[styles.receiptMonoText, styles.receiptTotalText]}>TOTAL:</Text>
-                <Text style={[styles.receiptMonoText, styles.receiptTotalText]}>
-                  ₹{total.toFixed(2)}
-                </Text>
-              </View>
-            </View>
-
-            {/* 11. HORIZONTAL LINE */}
-            <View style={styles.receiptDivider} />
-
-            {/* 12. 100% DYNAMIC PAYMENT DETAILS */}
+            {/* 10. 100% DYNAMIC PAYMENT DETAILS */}
             <View style={styles.receiptMetaBlock}>
               <View style={styles.receiptRowBetween}>
                 <Text style={styles.receiptMonoText}>Payment Method:</Text>
@@ -560,11 +525,7 @@ export function InvoicePreviewModal({
                 </Text>
               </View>
 
-              {isCOD ? (
-                <Text style={[styles.receiptMonoText, styles.receiptBold, { marginTop: 4 }]}>
-                  Amount To Be Collected: ₹{total.toFixed(2)}
-                </Text>
-              ) : txnId ? (
+              {!isCOD && txnId ? (
                 <Text style={[styles.receiptMonoText, { marginTop: 4 }]}>
                   Transaction ID: {txnId}
                 </Text>
