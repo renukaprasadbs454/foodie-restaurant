@@ -78,6 +78,18 @@ function parseBoundaries(boundaryStr: string) {
   });
 }
 
+function getDistanceFromLatLonInKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Radius of the earth in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in km
+}
+
 export function RestaurantRegistrationScreen({ navigation }: Props) {
   const { isConnected } = useConnectivity();
   const dispatch = useAppDispatch();
@@ -308,8 +320,11 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
     };
 
     let matchedZone = null;
+    let nearestZone: any = null;
+    let minDistanceKm = Infinity;
+
     for (const zone of zones) {
-      if (!zone.restaurantEnabled) continue;
+      if (!zone.restaurantEnabled && zone.status !== 'ACTIVE') continue;
 
       let isMatch = false;
 
@@ -318,6 +333,10 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
         const dist = getDistanceFromLatLonInKm(pt.lat, pt.lng, zone.latitude, zone.longitude);
         if (dist <= zone.radiusKm) {
           isMatch = true;
+        }
+        if (dist < minDistanceKm) {
+          minDistanceKm = dist;
+          nearestZone = zone;
         }
       }
 
@@ -335,14 +354,25 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
       }
     }
 
+    if (!nearestZone && zones.length > 0) {
+      nearestZone = zones[0];
+      if (nearestZone.latitude && nearestZone.longitude) {
+        minDistanceKm = getDistanceFromLatLonInKm(pt.lat, pt.lng, nearestZone.latitude, nearestZone.longitude);
+      } else {
+        minDistanceKm = 5.0;
+      }
+    }
+
     if (matchedZone) {
       const finalPayload = {
         ...validated.value,
         zoneId: matchedZone.id,
         zoneName: matchedZone.zoneName,
+        isOutOfZone: false,
+        distanceFromNearestZone: 0,
         address: {
           ...validated.value.address,
-          city: matchedZone.cityName
+          city: matchedZone.cityName || validated.value.address.city
         }
       };
 
@@ -368,13 +398,42 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
         );
       }
     } else {
+      // Out of Zone Flow: Allow document upload and final KYC submission with nearest zone reference
+      const roundedDist = Math.max(0.1, Math.round(minDistanceKm * 10) / 10);
+      const zoneNameStr = nearestZone?.zoneName || 'operating zone';
+      const distanceDescription = `${roundedDist} km from ${zoneNameStr}`;
+
+      const finalPayload = {
+        ...validated.value,
+        zoneId: nearestZone?.id || 'dz-out-of-zone',
+        zoneName: nearestZone?.zoneName || 'Out of Zone',
+        isOutOfZone: true,
+        distanceFromNearestZone: roundedDist,
+        address: {
+          ...validated.value.address,
+          city: validated.value.address.city || nearestZone?.cityName || 'Out of Zone'
+        }
+      };
+
+      const outOfZoneMessage = `Your restaurant location is outside our active delivery zone (~${distanceDescription}).\n\nYou can still proceed to upload compliance documents and complete KYC onboarding.\n\nYour application will be submitted to the Admin operations team for zone extension review. Do you want to proceed?`;
+
       if (Platform.OS === 'web') {
-        window.alert('Your restaurant is out of the zone. We will come soon to your location.');
+        const confirmed = window.confirm(outOfZoneMessage);
+        if (!confirmed) return;
+        proceedToRegister(finalPayload);
       } else {
         Alert.alert(
-          'Out of Service Area',
-          'Your restaurant is out of the zone. We will come soon to your location.',
-          [{ text: 'OK' }]
+          'Out of Active Zone Notice',
+          outOfZoneMessage,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Proceed with KYC',
+              onPress: () => {
+                proceedToRegister(finalPayload);
+              },
+            },
+          ]
         );
       }
     }
@@ -781,6 +840,61 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
             </View>
           </View>
 
+          {/* Dynamic Zone Serviceability Status Indicator */}
+          {Boolean(latitude && longitude) && (() => {
+            const ptLat = parseFloat(latitude);
+            const ptLng = parseFloat(longitude);
+            if (isNaN(ptLat) || isNaN(ptLng)) return null;
+
+            const zones = Array.isArray(zonesResponse) ? zonesResponse : [];
+            let inZone: any = null;
+            let nearest: any = null;
+            let minD = Infinity;
+
+            for (const z of zones) {
+              if (!z.restaurantEnabled && z.status !== 'ACTIVE') continue;
+              if (z.latitude && z.longitude && z.radiusKm) {
+                const d = getDistanceFromLatLonInKm(ptLat, ptLng, z.latitude, z.longitude);
+                if (d <= z.radiusKm) inZone = z;
+                if (d < minD) {
+                  minD = d;
+                  nearest = z;
+                }
+              }
+            }
+
+            if (inZone) {
+              return (
+                <View style={{ backgroundColor: '#F0FDF4', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#BBF7D0', marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={{ fontSize: 16 }}>✅</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#166534' }}>
+                      In Active Delivery Zone: {inZone.zoneName}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#15803D', marginTop: 2 }}>
+                      Outlet location is within active delivery coverage.
+                    </Text>
+                  </View>
+                </View>
+              );
+            }
+
+            const distDisplay = isFinite(minD) ? `${(Math.round(minD * 10) / 10).toFixed(1)} km from ${nearest?.zoneName || 'active zone'}` : 'Outside active delivery boundary';
+
+            return (
+              <View style={{ backgroundColor: '#FFFBEB', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#FDE68A', marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ fontSize: 16 }}>📍</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#B45309' }}>
+                    Out of Zone ({distDisplay})
+                  </Text>
+                  <Text style={{ fontSize: 11, color: '#92400E', marginTop: 2 }}>
+                    Out of zone onboarding allowed. You can complete document upload and KYC; request will be sent for admin zone extension review.
+                  </Text>
+                </View>
+              </View>
+            );
+          })()}
 
         </View>
 

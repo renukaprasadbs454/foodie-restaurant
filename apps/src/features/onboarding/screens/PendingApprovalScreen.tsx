@@ -202,6 +202,20 @@ export function PendingApprovalScreen({ navigation }: Props) {
                 ? 'Your restaurant has been verified! Redirecting to your live order dashboard…'
                 : 'Our operations team is currently reviewing your restaurant profile, legal documents, and images. Approval takes up to 24 hours.'}
             </Text>
+
+            {status !== 'APPROVED' && Boolean((query.data as any)?.outOfZone || (query.data as any)?.nearestZoneDistanceKm) && (
+              <View style={{ backgroundColor: '#FFFBEB', padding: 12, borderRadius: 12, marginTop: 14, borderWidth: 1, borderColor: '#FDE68A', flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                <Text style={{ fontSize: 16 }}>📍</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#92400E' }}>
+                    Zone Serviceability Review
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#B45309', marginTop: 3, lineHeight: 17 }}>
+                    Your restaurant is located outside active operational boundaries (~{(query.data as any)?.nearestZoneDistanceKm ? `${Number((query.data as any).nearestZoneDistanceKm).toFixed(1)} km from ` : ''}{query.data?.zoneName || 'nearest zone'}). The zone administration is reviewing your location for zone extension and approval.
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
         )}
 

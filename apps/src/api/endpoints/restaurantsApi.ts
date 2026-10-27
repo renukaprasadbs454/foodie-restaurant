@@ -108,6 +108,11 @@ export const restaurantsApi = baseApi.injectEndpoints({
             name: body.name,
             description: body.description ?? null,
             cuisineTypes: body.cuisineTypes,
+            restaurantType: body.restaurantType,
+            zoneId: body.zoneId,
+            zoneName: body.zoneName,
+            isOutOfZone: (body as any).isOutOfZone,
+            distanceFromNearestZone: (body as any).distanceFromNearestZone,
             address: body.address,
             // commissionPct accepted but ignored server-side — omit from client
           },
