@@ -70,6 +70,10 @@ export type RestaurantDetail = {
   closeTime?: string | null;
   openDays?: string[] | null;
   documents?: { docType: string }[] | null;
+  zoneId?: string | null;
+  zoneName?: string | null;
+  outOfZone?: boolean | null;
+  nearestZoneDistanceKm?: number | null;
 };
 
 export type RestaurantDocumentUploadResult = {
