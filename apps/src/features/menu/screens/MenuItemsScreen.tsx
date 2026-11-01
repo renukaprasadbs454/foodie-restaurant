@@ -90,6 +90,19 @@ function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').trim();
 }
 
+function getCategoryIcon(name: string): string {
+  const lower = (name || '').toLowerCase();
+  if (lower.includes('biryani') || lower.includes('pulao') || lower.includes('rice')) return '🍛';
+  if (lower.includes('starter') || lower.includes('appetizer') || lower.includes('tikka') || lower.includes('kebab') || lower.includes('salad')) return '🥗';
+  if (lower.includes('main') || lower.includes('curry') || lower.includes('gravy') || lower.includes('dal')) return '🍲';
+  if (lower.includes('dessert') || lower.includes('sweet') || lower.includes('ice') || lower.includes('cake') || lower.includes('halwa')) return '🍰';
+  if (lower.includes('beverage') || lower.includes('drink') || lower.includes('shake') || lower.includes('juice') || lower.includes('chai') || lower.includes('tea') || lower.includes('coffee') || lower.includes('lassi')) return '🥤';
+  if (lower.includes('bread') || lower.includes('roti') || lower.includes('naan') || lower.includes('paratha')) return '🫓';
+  if (lower.includes('pizza') || lower.includes('burger') || lower.includes('sandwich') || lower.includes('snack')) return '🍔';
+  if (lower.includes('noodle') || lower.includes('chinese') || lower.includes('soup')) return '🍜';
+  return '🍽️';
+}
+
 function isItemInCategory(item: NormalizedMenuItem, categoryId: string): boolean {
   if (categoryId === 'all') return true;
   const target = categoryId.toLowerCase();
@@ -198,6 +211,8 @@ export function MenuItemsScreen({ navigation }: Props) {
   const [formFoodType, setFormFoodType] = useState<FoodType>('VEG');
   const [formCategoryId, setFormCategoryId] = useState<string>('main_course');
   const [formCategoryName, setFormCategoryName] = useState<string>('Main Course');
+  const [isAddingCustomCategory, setIsAddingCustomCategory] = useState<boolean>(false);
+  const [customCategoryInput, setCustomCategoryInput] = useState<string>('');
   const [formPrepTime, setFormPrepTime] = useState<string>('15 min');
   const [formIsAvailable, setFormIsAvailable] = useState<boolean>(true);
   const [formImageUrl, setFormImageUrl] = useState<string | null>(null);
@@ -273,27 +288,82 @@ export function MenuItemsScreen({ navigation }: Props) {
     trackAnalyticsEvent('restaurant_menu_management_viewed');
   }, []);
 
+  // Dynamic category pills for horizontal category bar
+  const displayCategories: CategoryPill[] = useMemo(() => {
+    const list: CategoryPill[] = [{ id: 'all', name: 'All Items', icon: '🍽️' }];
+    const realCats = menuQuery.data?.categories || [];
+    const addedNames = new Set<string>();
+
+    if (realCats.length > 0) {
+      for (const c of realCats) {
+        const cName = c.name || (c as any).categoryName || 'Category';
+        list.push({
+          id: c.categoryId,
+          name: cName,
+          icon: getCategoryIcon(cName),
+        });
+        addedNames.add(cName.trim().toLowerCase());
+      }
+    }
+
+    // Add default category suggestions if not already added
+    for (const d of DEFAULT_CATEGORIES) {
+      if (d.id === 'all') continue;
+      if (!addedNames.has(d.name.trim().toLowerCase())) {
+        list.push({
+          id: d.id,
+          name: d.name,
+          icon: d.icon,
+        });
+      }
+    }
+
+    return list;
+  }, [menuQuery.data?.categories]);
+
   // Category counts derived directly from menuItems array
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {
       all: menuItems.length,
-      biryani: 0,
-      starters: 0,
-      main_course: 0,
-      desserts: 0,
-      beverages: 0,
     };
 
-    for (const item of menuItems) {
-      if (isItemInCategory(item, 'biryani')) counts.biryani++;
-      if (isItemInCategory(item, 'starters')) counts.starters++;
-      if (isItemInCategory(item, 'main_course')) counts.main_course++;
-      if (isItemInCategory(item, 'desserts')) counts.desserts++;
-      if (isItemInCategory(item, 'beverages')) counts.beverages++;
+    for (const cat of displayCategories) {
+      if (cat.id === 'all') continue;
+      counts[cat.id] = menuItems.filter((item) => isItemInCategory(item, cat.id)).length;
     }
 
     return counts;
-  }, [menuItems]);
+  }, [menuItems, displayCategories]);
+
+  // Categories available inside Add / Edit Item modal
+  const availableFormCategories = useMemo(() => {
+    const list: { id: string; name: string; icon: string }[] = [];
+    const realCats = menuQuery.data?.categories || [];
+    const addedNames = new Set<string>();
+
+    for (const c of realCats) {
+      const name = c.name || (c as any).categoryName || 'Category';
+      list.push({
+        id: c.categoryId,
+        name,
+        icon: getCategoryIcon(name),
+      });
+      addedNames.add(name.trim().toLowerCase());
+    }
+
+    for (const d of DEFAULT_CATEGORIES) {
+      if (d.id === 'all') continue;
+      if (!addedNames.has(d.name.trim().toLowerCase())) {
+        list.push({
+          id: d.id,
+          name: d.name,
+          icon: d.icon,
+        });
+      }
+    }
+
+    return list;
+  }, [menuQuery.data?.categories]);
 
   // Menu Summary Metrics
   const summaryStats = useMemo(() => {
@@ -385,13 +455,33 @@ export function MenuItemsScreen({ navigation }: Props) {
     setFormDescription('');
     setFormPrice('');
     setFormFoodType('VEG');
-    const firstRealCategory = menuQuery.data?.categories?.[0];
-    setFormCategoryId(
-      firstRealCategory ? firstRealCategory.categoryId : 'main_course'
-    );
-    setFormCategoryName(
-      firstRealCategory ? firstRealCategory.name || 'Category' : 'Main Course'
-    );
+
+    let initialCatId = '';
+    let initialCatName = 'Main Course';
+
+    if (selectedCategoryId !== 'all') {
+      const selectedPill = displayCategories.find((c) => c.id === selectedCategoryId);
+      if (selectedPill) {
+        initialCatId = selectedPill.id;
+        initialCatName = selectedPill.name;
+      }
+    }
+
+    if (!initialCatId) {
+      const firstReal = menuQuery.data?.categories?.[0];
+      if (firstReal) {
+        initialCatId = firstReal.categoryId;
+        initialCatName = firstReal.name || (firstReal as any).categoryName || 'Main Course';
+      } else {
+        initialCatId = 'main_course';
+        initialCatName = 'Main Course';
+      }
+    }
+
+    setFormCategoryId(initialCatId);
+    setFormCategoryName(initialCatName);
+    setIsAddingCustomCategory(false);
+    setCustomCategoryInput('');
     setFormPrepTime('15 min');
     setFormIsAvailable(true);
     setFormImageUrl(null);
@@ -413,6 +503,8 @@ export function MenuItemsScreen({ navigation }: Props) {
     setFormFoodType(item.foodType);
     setFormCategoryId(item.categoryId);
     setFormCategoryName(item.categoryName);
+    setIsAddingCustomCategory(false);
+    setCustomCategoryInput('');
     setFormPrepTime(item.preparationTime);
     setFormIsAvailable(item.isAvailable);
     setFormImageUrl(item.imageUrl ?? null);
@@ -465,18 +557,47 @@ export function MenuItemsScreen({ navigation }: Props) {
       return;
     }
 
-    setFormError('');
-
     const targetCatObj = DEFAULT_CATEGORIES.find((c) => c.id === formCategoryId);
-    const catName = formCategoryName || (targetCatObj ? targetCatObj.name : 'Main Course');
-    let catId = formCategoryId.includes('-') ? formCategoryId : '';
+    const chosenName = (
+      isAddingCustomCategory && customCategoryInput.trim()
+        ? customCategoryInput.trim()
+        : formCategoryName.trim() || (targetCatObj ? targetCatObj.name : 'Main Course')
+    ).trim();
+
+    // 1. Resolve matching category in the restaurant's existing categories (by ID or matching name)
+    const existingCat = menuQuery.data?.categories?.find(
+      (c) =>
+        (formCategoryId && formCategoryId.includes('-') && c.categoryId === formCategoryId) ||
+        (c.name && c.name.trim().toLowerCase() === chosenName.toLowerCase())
+    );
+
+    let catId = existingCat ? existingCat.categoryId : '';
+
+    // 2. If no existing category found on server and we are connected, create the category first!
+    if (!catId && isConnected && !isUsingMock) {
+      try {
+        const newCat = await createCategory({
+          name: chosenName,
+          displayOrder: (menuQuery.data?.categories?.length ?? 0) + 1,
+        }).unwrap();
+        if (newCat?.categoryId) {
+          catId = newCat.categoryId;
+        }
+      } catch (catErr: any) {
+        console.warn('Auto-create category error:', catErr);
+      }
+    }
+
+    // 3. Fallback if still empty (e.g. offline/mock)
     if (!catId) {
       if (menuQuery.data?.categories && menuQuery.data.categories.length > 0) {
         catId = menuQuery.data.categories[0].categoryId;
       } else {
-        catId = '170052ea-c439-44d5-866d-bcbf6ccebe98';
+        catId = generateMockUuid();
       }
     }
+
+    const catName = chosenName;
 
     if (editingItem) {
       // EDIT ITEM
@@ -698,7 +819,7 @@ export function MenuItemsScreen({ navigation }: Props) {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.categoryScrollContent}
           >
-            {DEFAULT_CATEGORIES.map((cat) => {
+            {displayCategories.map((cat) => {
               const isSelected = selectedCategoryId === cat.id;
               const count = categoryCounts[cat.id] ?? 0;
 
@@ -1171,39 +1292,76 @@ export function MenuItemsScreen({ navigation }: Props) {
 
               {/* Category Selector * */}
               <View style={{ gap: tokens.spacing.xs }}>
-                <Text variant="label">Category *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                  {(menuQuery.data?.categories?.length ? menuQuery.data.categories.map(c => ({ id: c.categoryId, name: c.name || (c as any).categoryName, icon: '🍽️' })) : DEFAULT_CATEGORIES.filter((c) => c.id !== 'all')).map((cat) => {
-                    const isSelected = formCategoryId === cat.id;
-                    return (
-                      <Pressable
-                        key={cat.id}
-                        onPress={() => {
-                          setFormCategoryId(cat.id);
-                          setFormCategoryName(cat.name);
-                        }}
-                        style={{
-                          paddingHorizontal: 12,
-                          paddingVertical: 8,
-                          borderRadius: 8,
-                          borderWidth: 1.5,
-                          borderColor: isSelected ? BRAND_PRIMARY : '#CBD5E1',
-                          backgroundColor: isSelected ? BRAND_PRIMARY : '#F8FAFC',
-                        }}
-                      >
-                        <Text
-                          variant="caption"
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text variant="label">Category *</Text>
+                  <Pressable
+                    onPress={() => {
+                      setIsAddingCustomCategory((prev) => !prev);
+                      if (!isAddingCustomCategory) {
+                        setCustomCategoryInput('');
+                      }
+                    }}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Toggle custom category input"
+                  >
+                    <Text variant="caption" style={{ color: BRAND_PRIMARY, fontWeight: 'bold' }}>
+                      {isAddingCustomCategory ? '✕ Existing Categories' : '➕ Add Custom Category'}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {isAddingCustomCategory ? (
+                  <View style={{ marginTop: 4 }}>
+                    <TextInput
+                      label="New Category Name"
+                      value={customCategoryInput}
+                      onChangeText={(val) => {
+                        setCustomCategoryInput(val);
+                        setFormCategoryName(val);
+                        setFormCategoryId('custom');
+                      }}
+                      placeholder="e.g. South Indian, Ice Creams, Platters"
+                      accessibilityLabel="Custom category name input"
+                    />
+                  </View>
+                ) : (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                    {availableFormCategories.map((cat) => {
+                      const isSelected =
+                        formCategoryId === cat.id ||
+                        (!formCategoryId.includes('-') && formCategoryName.toLowerCase() === cat.name.toLowerCase());
+                      return (
+                        <Pressable
+                          key={cat.id}
+                          onPress={() => {
+                            setFormCategoryId(cat.id);
+                            setFormCategoryName(cat.name);
+                            setIsAddingCustomCategory(false);
+                          }}
                           style={{
-                            color: isSelected ? '#FFFFFF' : '#334155',
-                            fontWeight: isSelected ? 'bold' : 'normal',
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            borderRadius: 8,
+                            borderWidth: 1.5,
+                            borderColor: isSelected ? BRAND_PRIMARY : '#CBD5E1',
+                            backgroundColor: isSelected ? BRAND_PRIMARY : '#F8FAFC',
                           }}
                         >
-                          {cat.icon} {cat.name}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
+                          <Text
+                            variant="caption"
+                            style={{
+                              color: isSelected ? '#FFFFFF' : '#334155',
+                              fontWeight: isSelected ? 'bold' : 'normal',
+                            }}
+                          >
+                            {cat.icon} {cat.name}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                )}
               </View>
 
               {/* Base Price (₹) * */}

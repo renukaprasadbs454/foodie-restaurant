@@ -227,13 +227,13 @@ export const ordersApi = baseApi.injectEndpoints({
         };
 
         let res = await baseQuery({
-          url: '/api/v1/restaurants/me/orders',
+          url: '/api/v1/orders/restaurant',
           params,
         });
 
         if (res.error) {
           res = await baseQuery({
-            url: '/api/v1/orders/restaurant',
+            url: '/api/v1/restaurants/me/orders',
             params,
           });
         }
@@ -263,9 +263,9 @@ export const ordersApi = baseApi.injectEndpoints({
           return { error: { status: 400, data: 'Invalid orderId' } as any };
         }
 
-        let res = await baseQuery(`/api/v1/restaurants/me/orders/${cleanId}`);
+        let res = await baseQuery(`/api/v1/orders/${cleanId}`);
         if (res.error) {
-          res = await baseQuery(`/api/v1/orders/${cleanId}`);
+          res = await baseQuery(`/api/v1/restaurants/me/orders/${cleanId}`);
         }
 
         if (!res.error && res.data) {
