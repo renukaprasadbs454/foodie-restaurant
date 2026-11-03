@@ -26,6 +26,7 @@ export const baseApi = createBaseApi({
     'Notification',
     'SupportConversation',
     'SupportMessage',
+    'Coupon',
   ] as const,
   getAccessToken: (state: unknown): string | null =>
     selectAccessToken(state as AuthRoot),

@@ -110,7 +110,7 @@ function CampaignsStackNavigator() {
       <CampaignsStack.Screen
         name="CampaignsHome"
         component={CampaignsScreen}
-        options={{ title: 'Campaigns' }}
+        options={{ title: 'Promos' }}
       />
     </CampaignsStack.Navigator>
   );
