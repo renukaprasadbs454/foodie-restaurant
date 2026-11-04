@@ -1,15 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, View, useWindowDimensions, Alert } from 'react-native';
+import { Platform, Pressable, View, useWindowDimensions, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Text, useTheme } from 'foodie-shared-rn';
+import { Button, Modal, Text, useTheme } from 'foodie-shared-rn';
 import Feather from '@expo/vector-icons/Feather';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { selectRestaurantId, setRestaurantCreated } from '../features/onboarding/restaurantOnboardingSlice';
 import { logoutRestaurant } from '../features/auth/session';
 import { store } from '../store/store';
 import { useGetRestaurantProfileQuery, useToggleRestaurantStatusMutation } from '../api/endpoints/restaurantsApi';
+import {
+  useCheckActiveOrdersQuery,
+  useLazyCheckActiveOrdersQuery,
+  useGetRestaurantOrdersQuery,
+} from '../api/endpoints/ordersApi';
 import { useGetNotificationsQuery } from '../api/endpoints/notificationsApi';
 import { RestaurantSupportModal } from '../features/profile/components/RestaurantSupportModal';
+import { toUnwrappedApiError } from '../features/auth/apiError';
+import {
+  hasActiveAcceptedOrders,
+  OFFLINE_BLOCKED_WARNING_MESSAGE,
+} from '../features/orders/types';
 
 let isAutoOverridden = false;
 
@@ -41,6 +51,10 @@ export function RestaurantHeader({
   const { data: profile } = useGetRestaurantProfileQuery(undefined, { skip: false });
   const [toggleStatus] = useToggleRestaurantStatusMutation();
   const [supportVisible, setSupportVisible] = useState(false);
+  const [activeOrderWarningVisible, setActiveOrderWarningVisible] = useState(false);
+  const [confirmOfflineVisible, setConfirmOfflineVisible] = useState(false);
+  const [confirmOnlineVisible, setConfirmOnlineVisible] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
 
   useEffect(() => {
     if (profile?.restaurantId && !restaurantId) {
@@ -50,6 +64,16 @@ export function RestaurantHeader({
 
   const effectiveRestaurantId = profile?.restaurantId || restaurantId || '';
   const effectiveRestaurantName = profile?.name || 'Restaurant Partner';
+
+  const { data: activeOrdersCheck } = useCheckActiveOrdersQuery(undefined, {
+    pollingInterval: 3000,
+  });
+  const [triggerCheckActiveOrders] = useLazyCheckActiveOrdersQuery();
+
+  const ordersQuery = useGetRestaurantOrdersQuery(
+    { page: 0, size: 20 },
+    { pollingInterval: 3000 }
+  );
 
   const notificationsQuery = useGetNotificationsQuery(
     { unreadOnly: true, page: 0, size: 20 },
@@ -105,6 +129,11 @@ export function RestaurantHeader({
         }
 
         if (shouldBeOpen !== isOnline) {
+          const hasActive = Boolean(activeOrdersCheck?.hasActiveOrders) || hasActiveAcceptedOrders(ordersQuery.data);
+          if (!shouldBeOpen && hasActive) {
+            // Keep the restaurant Online until all active orders are completed or cancelled
+            return;
+          }
           // Fire and forget
           toggleStatus(shouldBeOpen).catch(() => { });
         }
@@ -117,7 +146,85 @@ export function RestaurantHeader({
     const interval = setInterval(checkStatus, 30000); // Check every 30 seconds
 
     return () => clearInterval(interval);
-  }, [profile?.description, isOnline, toggleStatus]);
+  }, [profile?.description, isOnline, toggleStatus, activeOrdersCheck?.hasActiveOrders, ordersQuery.data]);
+
+  const handleToggleClick = async () => {
+    isAutoOverridden = true;
+    if (isOnline) {
+      // 1. Query real-time active customer orders from backend for this restaurant
+      let hasActive = Boolean(activeOrdersCheck?.hasActiveOrders);
+      try {
+        const fresh = await triggerCheckActiveOrders().unwrap();
+        if (fresh && typeof fresh.hasActiveOrders === 'boolean') {
+          hasActive = fresh.hasActiveOrders;
+        } else if (ordersQuery.data) {
+          hasActive = hasActiveAcceptedOrders(ordersQuery.data);
+        }
+      } catch {
+        if (ordersQuery.data) {
+          hasActive = hasActiveAcceptedOrders(ordersQuery.data);
+        }
+      }
+
+      if (hasActive) {
+        // Show clear popup message!
+        setActiveOrderWarningVisible(true);
+        if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+          try {
+            window.alert(OFFLINE_BLOCKED_WARNING_MESSAGE);
+          } catch {
+            // ignore
+          }
+        }
+        return;
+      }
+
+      // No active orders -> allow switching offline normally via confirmation popup
+      setConfirmOfflineVisible(true);
+    } else {
+      // Offline -> show confirmation popup to switch Online
+      setConfirmOnlineVisible(true);
+    }
+  };
+
+  const handleConfirmOffline = async () => {
+    setConfirmOfflineVisible(false);
+    setIsToggling(true);
+    try {
+      await toggleStatus(false).unwrap();
+    } catch (err: any) {
+      const unwrapped = toUnwrappedApiError(err);
+      setActiveOrderWarningVisible(true);
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+        try {
+          window.alert(unwrapped.message || OFFLINE_BLOCKED_WARNING_MESSAGE);
+        } catch {
+          // ignore
+        }
+      }
+    } finally {
+      setIsToggling(false);
+    }
+  };
+
+  const handleConfirmOnline = async () => {
+    setConfirmOnlineVisible(false);
+    setIsToggling(true);
+    try {
+      await toggleStatus(true).unwrap();
+    } catch (err: any) {
+      const unwrapped = toUnwrappedApiError(err);
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+        try {
+          window.alert(unwrapped.message || 'Failed to go online.');
+        } catch {
+          // ignore
+        }
+      }
+    } finally {
+      setIsToggling(false);
+    }
+  };
 
   const handleNotificationPress = () => {
     if (navigation && typeof navigation.navigate === 'function') {
@@ -208,28 +315,7 @@ export function RestaurantHeader({
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.sm }}>
           {/* ONLINE / OFFLINE TOGGLE PILL */}
           <Pressable
-            onPress={() => {
-              isAutoOverridden = true;
-              if (isOnline) {
-                Alert.alert(
-                  'Confirm Offline',
-                  'Are you sure you want to go offline? You will stop receiving new orders.',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Confirm', style: 'destructive', onPress: () => toggleStatus(false) },
-                  ]
-                );
-              } else {
-                Alert.alert(
-                  'Confirm Online',
-                  'Are you sure you want to go online? You will start receiving new orders.',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Confirm', style: 'default', onPress: () => toggleStatus(true) },
-                  ]
-                );
-              }
-            }}
+            onPress={handleToggleClick}
             accessibilityRole="button"
             accessibilityLabel={`Restaurant status ${isOnline ? 'Online' : 'Offline'}`}
             style={({ pressed }) => [{
@@ -242,7 +328,8 @@ export function RestaurantHeader({
               backgroundColor: isOnline ? '#064E3B' : '#7F1D1D',
               borderWidth: 1,
               borderColor: isOnline ? '#059669' : '#DC2626',
-              opacity: pressed ? 0.8 : 1,
+              opacity: pressed || isToggling ? 0.75 : 1,
+              cursor: Platform.OS === 'web' ? 'pointer' : undefined,
             }]}
           >
             <View
@@ -338,6 +425,185 @@ export function RestaurantHeader({
         restaurantId={effectiveRestaurantId}
         restaurantName={effectiveRestaurantName}
       />
+
+      {/* 1. ACTIVE ORDER WARNING POPUP MODAL */}
+      <Modal
+        visible={activeOrderWarningVisible}
+        onRequestClose={() => setActiveOrderWarningVisible(false)}
+        accessibilityLabel="Active Order Warning Modal"
+        contentStyle={{
+          maxWidth: 440,
+          width: '92%',
+          alignSelf: 'center',
+          backgroundColor: '#FFFFFF',
+          borderRadius: 16,
+          padding: 24,
+        }}
+      >
+        <View style={{ alignItems: 'center', gap: 16 }}>
+          <View
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 28,
+              backgroundColor: '#FEF3C7',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Feather name="alert-triangle" size={28} color="#D97706" />
+          </View>
+
+          <View style={{ gap: 8, alignItems: 'center' }}>
+            <Text
+              variant="heading2"
+              style={{ fontSize: 18, fontWeight: 'bold', color: '#111827', textAlign: 'center' }}
+            >
+              Cannot Go Offline
+            </Text>
+            <Text
+              variant="body"
+              style={{ fontSize: 14, color: '#374151', textAlign: 'center', lineHeight: 22 }}
+            >
+              {OFFLINE_BLOCKED_WARNING_MESSAGE}
+            </Text>
+          </View>
+
+          <Button
+            label="OK, Understood"
+            accessibilityLabel="Dismiss active order warning"
+            variant="primary"
+            onPress={() => setActiveOrderWarningVisible(false)}
+            style={{ width: '100%', marginTop: 8, backgroundColor: '#14532D' }}
+          />
+        </View>
+      </Modal>
+
+      {/* 2. CONFIRM OFFLINE MODAL */}
+      <Modal
+        visible={confirmOfflineVisible}
+        onRequestClose={() => setConfirmOfflineVisible(false)}
+        accessibilityLabel="Confirm Offline Modal"
+        contentStyle={{
+          maxWidth: 440,
+          width: '92%',
+          alignSelf: 'center',
+          backgroundColor: '#FFFFFF',
+          borderRadius: 16,
+          padding: 24,
+        }}
+      >
+        <View style={{ alignItems: 'center', gap: 16 }}>
+          <View
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 28,
+              backgroundColor: '#FEE2E2',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Feather name="power" size={28} color="#DC2626" />
+          </View>
+
+          <View style={{ gap: 8, alignItems: 'center' }}>
+            <Text
+              variant="heading2"
+              style={{ fontSize: 18, fontWeight: 'bold', color: '#111827', textAlign: 'center' }}
+            >
+              Go Offline?
+            </Text>
+            <Text
+              variant="body"
+              style={{ fontSize: 14, color: '#374151', textAlign: 'center', lineHeight: 22 }}
+            >
+              Are you sure you want to go offline? You will stop receiving new customer orders.
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 12, width: '100%', marginTop: 8 }}>
+            <Button
+              label="Cancel"
+              accessibilityLabel="Cancel offline switch"
+              variant="secondary"
+              onPress={() => setConfirmOfflineVisible(false)}
+              style={{ flex: 1 }}
+            />
+            <Button
+              label="Go Offline"
+              accessibilityLabel="Confirm go offline"
+              variant="danger"
+              loading={isToggling}
+              onPress={handleConfirmOffline}
+              style={{ flex: 1, backgroundColor: '#DC2626' }}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* 3. CONFIRM ONLINE MODAL */}
+      <Modal
+        visible={confirmOnlineVisible}
+        onRequestClose={() => setConfirmOnlineVisible(false)}
+        accessibilityLabel="Confirm Online Modal"
+        contentStyle={{
+          maxWidth: 440,
+          width: '92%',
+          alignSelf: 'center',
+          backgroundColor: '#FFFFFF',
+          borderRadius: 16,
+          padding: 24,
+        }}
+      >
+        <View style={{ alignItems: 'center', gap: 16 }}>
+          <View
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 28,
+              backgroundColor: '#DCFCE7',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Feather name="check-circle" size={28} color="#16A34A" />
+          </View>
+
+          <View style={{ gap: 8, alignItems: 'center' }}>
+            <Text
+              variant="heading2"
+              style={{ fontSize: 18, fontWeight: 'bold', color: '#111827', textAlign: 'center' }}
+            >
+              Go Online?
+            </Text>
+            <Text
+              variant="body"
+              style={{ fontSize: 14, color: '#374151', textAlign: 'center', lineHeight: 22 }}
+            >
+              Are you sure you want to go online? You will start receiving new customer orders.
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 12, width: '100%', marginTop: 8 }}>
+            <Button
+              label="Cancel"
+              accessibilityLabel="Cancel online switch"
+              variant="secondary"
+              onPress={() => setConfirmOnlineVisible(false)}
+              style={{ flex: 1 }}
+            />
+            <Button
+              label="Go Online"
+              accessibilityLabel="Confirm go online"
+              variant="primary"
+              loading={isToggling}
+              onPress={handleConfirmOnline}
+              style={{ flex: 1, backgroundColor: '#14532D' }}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

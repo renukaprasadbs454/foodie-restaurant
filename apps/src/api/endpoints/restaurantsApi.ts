@@ -161,8 +161,14 @@ export const restaurantsApi = baseApi.injectEndpoints({
           ? [
             { type: 'Restaurant', id: result.restaurantId },
             { type: 'Restaurant', id: 'LIST' },
+            { type: 'Order' as any, id: 'ACTIVE_CHECK' },
+            { type: 'Order' as any, id: 'LIST' },
           ]
-          : [{ type: 'Restaurant', id: 'LIST' }],
+          : [
+            { type: 'Restaurant', id: 'LIST' },
+            { type: 'Order' as any, id: 'ACTIVE_CHECK' },
+            { type: 'Order' as any, id: 'LIST' },
+          ],
     }),
     toggleRestaurantStatus: builder.mutation<RestaurantDetail, boolean>({
       query: (isOpen) => ({
@@ -175,8 +181,14 @@ export const restaurantsApi = baseApi.injectEndpoints({
           ? [
             { type: 'Restaurant', id: result.restaurantId },
             { type: 'Restaurant', id: 'LIST' },
+            { type: 'Order' as any, id: 'ACTIVE_CHECK' },
+            { type: 'Order' as any, id: 'LIST' },
           ]
-          : [{ type: 'Restaurant', id: 'LIST' }],
+          : [
+            { type: 'Restaurant', id: 'LIST' },
+            { type: 'Order' as any, id: 'ACTIVE_CHECK' },
+            { type: 'Order' as any, id: 'LIST' },
+          ],
     }),
     getRestaurantReviews: builder.query<
       RestaurantReview[],
@@ -269,8 +281,14 @@ export const restaurantsApi = baseApi.injectEndpoints({
           ? [
             { type: 'Restaurant', id: result.restaurantId },
             { type: 'Restaurant', id: 'LIST' },
+            { type: 'Order' as any, id: 'ACTIVE_CHECK' },
+            { type: 'Order' as any, id: 'LIST' },
           ]
-          : [{ type: 'Restaurant', id: 'LIST' }],
+          : [
+            { type: 'Restaurant', id: 'LIST' },
+            { type: 'Order' as any, id: 'ACTIVE_CHECK' },
+            { type: 'Order' as any, id: 'LIST' },
+          ],
     }),
     updateTimings: builder.mutation<RestaurantDetail, { openTime: string; closeTime: string; openDays: string[] }>({
       query: (body) => ({
@@ -284,8 +302,14 @@ export const restaurantsApi = baseApi.injectEndpoints({
           ? [
             { type: 'Restaurant', id: result.restaurantId },
             { type: 'Restaurant', id: 'LIST' },
+            { type: 'Order' as any, id: 'ACTIVE_CHECK' },
+            { type: 'Order' as any, id: 'LIST' },
           ]
-          : [{ type: 'Restaurant', id: 'LIST' }],
+          : [
+            { type: 'Restaurant', id: 'LIST' },
+            { type: 'Order' as any, id: 'ACTIVE_CHECK' },
+            { type: 'Order' as any, id: 'LIST' },
+          ],
     }),
     submitRegistration: builder.mutation<RestaurantDetail, void>({
       query: () => ({
@@ -298,8 +322,14 @@ export const restaurantsApi = baseApi.injectEndpoints({
           ? [
             { type: 'Restaurant', id: result.restaurantId },
             { type: 'Restaurant', id: 'LIST' },
+            { type: 'Order' as any, id: 'ACTIVE_CHECK' },
+            { type: 'Order' as any, id: 'LIST' },
           ]
-          : [{ type: 'Restaurant', id: 'LIST' }],
+          : [
+            { type: 'Restaurant', id: 'LIST' },
+            { type: 'Order' as any, id: 'ACTIVE_CHECK' },
+            { type: 'Order' as any, id: 'LIST' },
+          ],
     }),
     getDashboardSummary: builder.query<any, { dateFrom?: string; dateTo?: string } | void>({
       query: (params) => ({

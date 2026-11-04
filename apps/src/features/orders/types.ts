@@ -152,6 +152,30 @@ export function isTerminalOrderStatus(status: string | undefined): boolean {
   return TERMINAL.has(status);
 }
 
+export const ACTIVE_ACCEPTED_ORDER_STATUSES: ReadonlySet<string> = new Set([
+  'ACCEPTED',
+  'PREPARING',
+  'WAITING_FOR_DELIVERY_PARTNER',
+  'READY_FOR_PICKUP',
+  'ASSIGNED',
+  'REACHED_RESTAURANT',
+]);
+
+/** True when an order has been accepted by restaurant but is not yet handed over, delivered, or cancelled. */
+export function isActiveAcceptedOrderStatus(status: string | undefined): boolean {
+  if (!status) return false;
+  return ACTIVE_ACCEPTED_ORDER_STATUSES.has(status.toUpperCase().trim());
+}
+
+/** Check if a list of orders contains any active accepted customer orders. */
+export function hasActiveAcceptedOrders(orders: Array<{ status?: string }> | null | undefined): boolean {
+  if (!orders || orders.length === 0) return false;
+  return orders.some((order) => isActiveAcceptedOrderStatus(order.status));
+}
+
+export const OFFLINE_BLOCKED_WARNING_MESSAGE =
+  'You have an active order. Please complete and hand over your order before going offline.';
+
 /** Restaurant-allowed next actions from current status (client UX; server enforces). */
 export function restaurantActionsForStatus(
   status: string | undefined,

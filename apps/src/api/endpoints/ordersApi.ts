@@ -307,6 +307,10 @@ export const ordersApi = baseApi.injectEndpoints({
       transformResponse: (response: unknown) => normalizeOrderItem(response),
       invalidatesTags: (_result, _error, arg) => [
         { type: 'Order', id: arg.orderId },
+        { type: 'Order', id: 'LIST' },
+        { type: 'Order', id: 'ACTIVE_CHECK' },
+        { type: 'Restaurant' as any, id: 'LIST' },
+        { type: 'Restaurant' as any, id: 'PROFILE' },
       ],
     }),
     getOrderMessages: builder.query<any[], string>({
@@ -588,6 +592,66 @@ export const ordersApi = baseApi.injectEndpoints({
       ],
       keepUnusedDataFor: 45,
     }),
+    checkActiveOrders: builder.query<{ hasActiveOrders: boolean; activeOrderCount: number }, void>({
+      async queryFn(_args, _queryApi, _extraOptions, baseQuery) {
+        let res = await baseQuery({
+          url: '/api/v1/restaurants/me/orders/active-check',
+        });
+
+        if (res.error) {
+          res = await baseQuery({
+            url: '/api/v1/restaurants/me/active-orders-check',
+          });
+        }
+
+        if (res.error) {
+          res = await baseQuery({
+            url: '/api/v1/orders/restaurant/active-check',
+          });
+        }
+
+        if (res.error) {
+          // Fallback to real-time order list from backend
+          const listRes = await baseQuery({
+            url: '/api/v1/restaurants/me/orders',
+            params: { page: 0, size: 50 },
+          });
+          if (listRes.data) {
+            const orders = normalizeOrderList(listRes.data);
+            const activeStatuses = new Set([
+              'ACCEPTED',
+              'PREPARING',
+              'WAITING_FOR_DELIVERY_PARTNER',
+              'READY_FOR_PICKUP',
+              'ASSIGNED',
+              'REACHED_RESTAURANT',
+            ]);
+            const activeOrders = orders.filter((o) => activeStatuses.has((o.status || '').toUpperCase()));
+            return {
+              data: {
+                hasActiveOrders: activeOrders.length > 0,
+                activeOrderCount: activeOrders.length,
+              },
+            };
+          }
+          return { error: res.error as any };
+        }
+
+        const data: any = res.data;
+        const unwrapped = data?.data ?? data;
+        return {
+          data: {
+            hasActiveOrders: Boolean(unwrapped?.hasActiveOrders),
+            activeOrderCount: Number(unwrapped?.activeOrderCount || 0),
+          },
+        };
+      },
+      providesTags: [
+        { type: 'Order' as const, id: 'ACTIVE_CHECK' },
+        { type: 'Order' as const, id: 'LIST' },
+      ],
+      keepUnusedDataFor: 5,
+    }),
   }),
 });
 
@@ -599,4 +663,6 @@ export const {
   useSendOrderMessageMutation,
   useGetOrderCustomerQuery,
   useGetOrderPaymentQuery,
+  useCheckActiveOrdersQuery,
+  useLazyCheckActiveOrdersQuery,
 } = ordersApi;
