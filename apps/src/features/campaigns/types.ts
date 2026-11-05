@@ -215,13 +215,16 @@ export function canonicalZoneId(zone?: string | null): string {
 
 /**
  * Checks whether a coupon is explicitly configured for All Locations.
- * Rule: Do not assume a missing zone ID means All Locations.
+ * Rule: Do not assume a missing zone ID means All Locations. Use actual zone IDs.
  */
 export function isAllLocationsCoupon(coupon: any): boolean {
   if (!coupon || typeof coupon !== 'object') return false;
   if (coupon.isAllZones === true) return true;
 
-  const zId = coupon.zoneId ? String(coupon.zoneId).trim().toUpperCase() : '';
+  // Rule: Do not assume a missing zone ID means All Locations
+  if (!coupon.zoneId) return false;
+
+  const zId = String(coupon.zoneId).trim().toUpperCase();
   if (
     zId === 'ALL' ||
     zId === 'ALL-LOCATIONS' ||
@@ -366,7 +369,7 @@ export function filterCouponsForRestaurant(
   const cleanRestId = restaurantId.trim();
   const cleanZone = restaurantZone ? canonicalZoneId(restaurantZone) : '';
 
-  return coupons
+  const filtered = coupons
     .filter((c) => {
       if (!c || typeof c !== 'object') return false;
 
@@ -418,7 +421,27 @@ export function filterCouponsForRestaurant(
       // Rule: Use actual zone IDs, not only zone names
       // Tumkur restaurants see Tumkur coupons, Bangalore restaurants see Bangalore coupons
       return isZoneMatching(couponZone, cleanZone);
-    })
-    .map((c) => normalizeCoupon({ ...c, restaurantId: cleanRestId }));
+    });
+
+  // De-duplicate coupons: prevent duplicate cards if multiple API responses or records exist
+  const seenIds = new Set<string>();
+  const seenCodes = new Set<string>();
+  const deduped: RestaurantCoupon[] = [];
+
+  for (const raw of filtered) {
+    const normalized = normalizeCoupon({ ...raw, restaurantId: cleanRestId });
+    const idKey = normalized.couponId ? normalized.couponId.trim().toLowerCase() : '';
+    const codeKey = normalized.code ? normalized.code.trim().toUpperCase() : '';
+
+    if (idKey && seenIds.has(idKey)) continue;
+    if (codeKey && seenCodes.has(codeKey)) continue;
+
+    if (idKey) seenIds.add(idKey);
+    if (codeKey) seenCodes.add(codeKey);
+
+    deduped.push(normalized);
+  }
+
+  return deduped;
 }
 

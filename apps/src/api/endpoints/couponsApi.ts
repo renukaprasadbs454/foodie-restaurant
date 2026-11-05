@@ -69,22 +69,14 @@ export const couponsApi = baseApi.injectEndpoints({
         let fetchedCoupons: any[] = [];
         let fetchedFromNetwork = false;
 
-        // 1. Fast parallel probe of candidate BFF endpoints with no-cache and zoneId
+        // 1. Parallel probe of candidate BFF endpoints (Admin Panel single source of truth prioritized)
         try {
-          const fetchPromises = candidateBffUrls.map(async (base) => {
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 1500);
-            try {
-              const queryParams = new URLSearchParams({
-                restaurantId: cleanRestId,
-                _t: String(Date.now()),
-              });
-              if (cleanZone) {
-                queryParams.set('zoneId', cleanZone);
-              }
-              const res = await fetch(
-                `${base}/api/bff/restaurant/coupons?${queryParams.toString()}`,
-                {
+          const fetchPromises = candidateBffUrls.flatMap((base) => {
+            const probeEndpoint = async (url: string) => {
+              const controller = new AbortController();
+              const timer = setTimeout(() => controller.abort(), 1500);
+              try {
+                const res = await fetch(url, {
                   method: 'GET',
                   headers: {
                     Accept: 'application/json',
@@ -93,21 +85,34 @@ export const couponsApi = baseApi.injectEndpoints({
                   },
                   cache: 'no-store',
                   signal: controller.signal,
-                },
-              );
-              clearTimeout(timer);
-              if (res.ok) {
-                const json = await res.json();
-                const list = json?.data ?? json;
-                if (Array.isArray(list)) {
-                  cachedWorkingBffUrl = base;
-                  return list;
+                });
+                clearTimeout(timer);
+                if (res.ok) {
+                  const json = await res.json();
+                  const list = json?.data ?? json;
+                  if (Array.isArray(list)) {
+                    cachedWorkingBffUrl = base;
+                    return list;
+                  }
                 }
+              } catch {
+                clearTimeout(timer);
               }
-            } catch {
-              clearTimeout(timer);
+              throw new Error('Not reachable');
+            };
+
+            const queryParams = new URLSearchParams({
+              restaurantId: cleanRestId,
+              _t: String(Date.now()),
+            });
+            if (cleanZone) {
+              queryParams.set('zoneId', cleanZone);
             }
-            throw new Error('Not reachable');
+
+            return [
+              probeEndpoint(`${base}/api/bff/admin/coupons?_t=${Date.now()}`),
+              probeEndpoint(`${base}/api/bff/restaurant/coupons?${queryParams.toString()}`),
+            ];
           });
 
           fetchedCoupons = await Promise.any(fetchPromises);

@@ -615,4 +615,130 @@ describe('Admin-Created Restaurant Coupons in Promos - Performance & Persistence
     const unverifiedPromos = filterCouponsForRestaurant(adminCreatedPool, 'unverified-rest', '');
     expect(unverifiedPromos).toEqual([]);
   });
+
+  // 13. Extra & Duplicate Coupons Elimination (Single Source of Truth)
+  it('13. Admin Panel single source of truth: eliminates extra seed coupons and duplicate entries', () => {
+    // Admin has created exactly 2 coupons for Tumkur Zone
+    const adminCreatedCoupons = [
+      {
+        couponId: 'c-admin-01',
+        code: 'TUMKUR50',
+        title: '50% OFF Tumkur Special',
+        discountType: 'PERCENT',
+        value: 50,
+        minOrderAmount: 299,
+        maxDiscountAmount: 150,
+        expiryDate: '2026-12-31T23:59:59Z',
+        restaurantId: null,
+        zoneId: 'dz-tumkur',
+        zoneName: 'Tumkur Zone',
+        isActive: true,
+        approvalStatus: 'APPROVED',
+      },
+      {
+        couponId: 'c-admin-02',
+        code: 'TUMKUR_FEST',
+        title: 'Tumkur Festival Treat',
+        discountType: 'FLAT',
+        value: 100,
+        minOrderAmount: 499,
+        maxDiscountAmount: null,
+        expiryDate: '2026-12-31T23:59:59Z',
+        restaurantId: null,
+        zoneId: 'dz-tumkur',
+        zoneName: 'Tumkur Zone',
+        isActive: true,
+        approvalStatus: 'APPROVED',
+      },
+      // Duplicate entry of TUMKUR50
+      {
+        couponId: 'c-admin-01-dup',
+        code: 'TUMKUR50',
+        title: 'Duplicate TUMKUR50',
+        discountType: 'PERCENT',
+        value: 50,
+        minOrderAmount: 299,
+        maxDiscountAmount: 150,
+        expiryDate: '2026-12-31T23:59:59Z',
+        restaurantId: null,
+        zoneId: 'dz-tumkur',
+        zoneName: 'Tumkur Zone',
+        isActive: true,
+        approvalStatus: 'APPROVED',
+      },
+      // Extra legacy / seed coupons with missing or generic zone
+      {
+        couponId: 'c-seed-01',
+        code: 'WEL',
+        title: 'Welcome Deal',
+        discountType: 'PERCENT',
+        value: 20,
+        minOrderAmount: 100,
+        maxDiscountAmount: 50,
+        expiryDate: '2026-12-31T23:59:59Z',
+        restaurantId: null,
+        zoneId: null,
+        zoneName: null,
+        isActive: true,
+        approvalStatus: 'APPROVED',
+      },
+      {
+        couponId: 'c-seed-02',
+        code: 'FOODIE13',
+        title: 'Foodie 13 Promo',
+        discountType: 'PERCENT',
+        value: 13,
+        minOrderAmount: 150,
+        maxDiscountAmount: 40,
+        expiryDate: '2026-12-31T23:59:59Z',
+        restaurantId: null,
+        zoneId: '',
+        zoneName: '',
+        isActive: true,
+        approvalStatus: 'APPROVED',
+      },
+      {
+        couponId: 'c-seed-03',
+        code: 'FOODIE15',
+        title: 'Foodie 15 Promo',
+        discountType: 'PERCENT',
+        value: 15,
+        minOrderAmount: 200,
+        maxDiscountAmount: 50,
+        expiryDate: '2026-12-31T23:59:59Z',
+        restaurantId: null,
+        zoneId: null,
+        zoneName: null,
+        isActive: true,
+        approvalStatus: 'APPROVED',
+      },
+      {
+        couponId: 'c-seed-04',
+        code: 'FOODIE16',
+        title: 'Foodie 16 Promo',
+        discountType: 'PERCENT',
+        value: 16,
+        minOrderAmount: 200,
+        maxDiscountAmount: 50,
+        expiryDate: '2026-12-31T23:59:59Z',
+        restaurantId: null,
+        zoneId: null,
+        zoneName: null,
+        isActive: true,
+        approvalStatus: 'APPROVED',
+      },
+    ];
+
+    const promos = filterCouponsForRestaurant(adminCreatedCoupons, 'rest-tumkur-401', 'dz-tumkur');
+
+    // Exactly 2 coupons must be displayed
+    expect(promos).toHaveLength(2);
+    expect(promos.map((p) => p.code)).toEqual(['TUMKUR50', 'TUMKUR_FEST']);
+
+    // Extra seed coupons must NOT be present
+    expect(promos.some((p) => p.code === 'WEL')).toBe(false);
+    expect(promos.some((p) => p.code === 'FOODIE13')).toBe(false);
+    expect(promos.some((p) => p.code === 'FOODIE15')).toBe(false);
+    expect(promos.some((p) => p.code === 'FOODIE16')).toBe(false);
+  });
 });
