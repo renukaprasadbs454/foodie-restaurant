@@ -15,6 +15,7 @@ import {
 } from '../api/endpoints/ordersApi';
 import { useGetNotificationsQuery } from '../api/endpoints/notificationsApi';
 import { RestaurantSupportModal } from '../features/profile/components/RestaurantSupportModal';
+import { SwitchRestaurantModal } from '../features/profile/components/SwitchRestaurantModal';
 import { toUnwrappedApiError } from '../features/auth/apiError';
 import {
   hasActiveAcceptedOrders,
@@ -51,6 +52,7 @@ export function RestaurantHeader({
   const { data: profile } = useGetRestaurantProfileQuery(undefined, { skip: false });
   const [toggleStatus] = useToggleRestaurantStatusMutation();
   const [supportVisible, setSupportVisible] = useState(false);
+  const [switchModalVisible, setSwitchModalVisible] = useState(false);
   const [activeOrderWarningVisible, setActiveOrderWarningVisible] = useState(false);
   const [confirmOfflineVisible, setConfirmOfflineVisible] = useState(false);
   const [confirmOnlineVisible, setConfirmOnlineVisible] = useState(false);
@@ -311,8 +313,39 @@ export function RestaurantHeader({
           </View>
         </View>
 
-        {/* RIGHT ACTION CONTROLS: ONLINE STATUS, LIVE SUPPORT & NOTIFICATION BELL */}
+        {/* RIGHT ACTION CONTROLS: SWITCH RESTAURANT, ONLINE STATUS, LIVE SUPPORT & NOTIFICATION BELL */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.sm }}>
+          {/* SWITCH RESTAURANT PILL */}
+          <Pressable
+            onPress={() => setSwitchModalVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Switch Restaurant"
+            style={({ pressed }) => [{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: 8,
+              paddingVertical: 5,
+              borderRadius: 12,
+              gap: 4,
+              backgroundColor: pressed ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.15)',
+              borderWidth: 1,
+              borderColor: 'rgba(255, 255, 255, 0.25)',
+              cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+            }]}
+          >
+            <Feather name="repeat" size={12} color="#FFFFFF" />
+            <Text
+              variant="caption"
+              style={{
+                color: '#FFFFFF',
+                fontWeight: 'bold',
+                fontSize: 11,
+              }}
+            >
+              Switch
+            </Text>
+          </Pressable>
+
           {/* ONLINE / OFFLINE TOGGLE PILL */}
           <Pressable
             onPress={handleToggleClick}
@@ -424,6 +457,65 @@ export function RestaurantHeader({
         onClose={() => setSupportVisible(false)}
         restaurantId={effectiveRestaurantId}
         restaurantName={effectiveRestaurantName}
+      />
+
+      {/* SWITCH RESTAURANT MODAL */}
+      <SwitchRestaurantModal
+        visible={switchModalVisible}
+        onClose={() => setSwitchModalVisible(false)}
+        onSelectRestaurant={(resto) => {
+          if (navigation && typeof navigation.navigate === 'function') {
+            const parent = navigation.getParent?.();
+            const targetNav = parent || navigation;
+            if (resto.status === 'APPROVED') {
+              try {
+                targetNav.navigate('OrdersTab', { screen: 'Dashboard' });
+              } catch {
+                try {
+                  targetNav.navigate('Dashboard');
+                } catch {
+                  // ignore
+                }
+              }
+            } else if (resto.status === 'PENDING') {
+              try {
+                targetNav.navigate('ProfileTab', { screen: 'PendingApproval' });
+              } catch {
+                try {
+                  targetNav.navigate('PendingApproval');
+                } catch {
+                  // ignore
+                }
+              }
+            } else if (resto.status === 'ONBOARDING') {
+              try {
+                targetNav.navigate('ProfileTab', { screen: 'RestaurantDocuments' });
+              } catch {
+                try {
+                  targetNav.navigate('RestaurantDocuments');
+                } catch {
+                  // ignore
+                }
+              }
+            }
+          }
+        }}
+        onAddAnotherRestaurant={() => {
+          if (navigation && typeof navigation.navigate === 'function') {
+            const parent = navigation.getParent?.();
+            if (parent) {
+              parent.navigate('ProfileTab', {
+                screen: 'RestaurantRegistration',
+                params: { isAddingAnother: true },
+              });
+            } else {
+              navigation.navigate('ProfileTab', {
+                screen: 'RestaurantRegistration',
+                params: { isAddingAnother: true },
+              });
+            }
+          }
+        }}
       />
 
       {/* 1. ACTIVE ORDER WARNING POPUP MODAL */}

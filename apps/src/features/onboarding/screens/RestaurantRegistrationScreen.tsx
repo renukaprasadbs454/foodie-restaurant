@@ -25,7 +25,7 @@ import { useAppDispatch } from '../../../store/hooks';
 import { clearIsNewUser } from '../../auth/authSlice';
 import { toUnwrappedApiError } from '../../auth/apiError';
 import { OnboardingStepper } from '../components/OnboardingStepper';
-import { setRestaurantCreated } from '../restaurantOnboardingSlice';
+import { setRestaurantCreated, setActiveRestaurantId } from '../restaurantOnboardingSlice';
 import { useGetZonesQuery } from '../../../api/endpoints/locationApi';
 import { logoutRestaurant } from '../../auth/session';
 import { store } from '../../../store/store';
@@ -90,7 +90,8 @@ function getDistanceFromLatLonInKm(lat1: number, lon1: number, lat2: number, lon
   return R * c; // Distance in km
 }
 
-export function RestaurantRegistrationScreen({ navigation }: Props) {
+export function RestaurantRegistrationScreen({ navigation, route }: any) {
+  const isAddingAnother = Boolean((route?.params as any)?.isAddingAnother);
   const { isConnected } = useConnectivity();
   const dispatch = useAppDispatch();
   const insets = useSafeAreaInsets();
@@ -145,6 +146,19 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
   const { data: profile } = useGetRestaurantProfileQuery(undefined, { skip: !isConnected });
 
   useEffect(() => {
+    if (isAddingAnother) {
+      setName('');
+      setDescription('');
+      setCuisineTypes([]);
+      setCustomCuisines([]);
+      setLine1('');
+      setLine2('');
+      setCity('');
+      setPincode('');
+      setLatitude('');
+      setLongitude('');
+      return;
+    }
     if (profile) {
       if (profile.name) setName(profile.name);
       if (profile.description) setDescription(profile.description);
@@ -168,7 +182,7 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
         setMapRegion(newRegion);
       }
     }
-  }, [profile]);
+  }, [profile, isAddingAnother]);
 
   const fetchExactLocation = async () => {
     setFetchingLocation(true);
@@ -445,20 +459,23 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
       const result = await register(registrationData).unwrap();
       const restaurantId = result?.restaurantId || (result as any)?.data?.restaurantId;
       if (!restaurantId) {
-        // Fallback check if profile was already created
-        const profile = await dispatch(
-          restaurantsApi.endpoints.getRestaurantProfile.initiate(undefined, { forceRefetch: true })
-        ).unwrap();
-        if (profile?.restaurantId) {
-          dispatch(
-            setRestaurantCreated({
-              restaurantId: profile.restaurantId,
-              status: profile.status ?? 'PENDING',
-            }),
-          );
-          dispatch(clearIsNewUser());
-          navigation.replace('RestaurantDocuments');
-          return;
+        if (!isAddingAnother) {
+          // Fallback check if profile was already created during first onboarding
+          const profile = await dispatch(
+            restaurantsApi.endpoints.getRestaurantProfile.initiate(undefined, { forceRefetch: true })
+          ).unwrap();
+          if (profile?.restaurantId && profile.status !== 'APPROVED') {
+            dispatch(
+              setRestaurantCreated({
+                restaurantId: profile.restaurantId,
+                status: profile.status ?? 'PENDING',
+              }),
+            );
+            dispatch(setActiveRestaurantId(profile.restaurantId));
+            dispatch(clearIsNewUser());
+            navigation.replace('RestaurantDocuments');
+            return;
+          }
         }
         setToast({
           message: 'Registration succeeded but restaurant id was missing.',
@@ -472,27 +489,38 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
           status: result.status ?? 'PENDING',
         }),
       );
+      dispatch(setActiveRestaurantId(restaurantId));
       dispatch(clearIsNewUser());
+      dispatch(restaurantsApi.util.invalidateTags([
+        { type: 'Restaurant', id: 'LIST' },
+        { type: 'Restaurant' as any, id: 'MY_LIST' },
+      ]));
       trackAnalyticsEvent('restaurant_created', { restaurantId });
-      navigation.replace('RestaurantDocuments');
+      if (typeof navigation.navigate === 'function') {
+        navigation.navigate('RestaurantDocuments');
+      } else {
+        navigation.replace('RestaurantDocuments');
+      }
     } catch (error) {
       const unwrapped = toUnwrappedApiError(error);
       if (
-        unwrapped.status === 409 ||
+        !isAddingAnother &&
+        (unwrapped.status === 409 ||
         Number(unwrapped.status) === 409 ||
-        unwrapped.code === 'RESTAURANT_PROFILE_ALREADY_EXISTS'
+        unwrapped.code === 'RESTAURANT_PROFILE_ALREADY_EXISTS')
       ) {
         try {
           const profileResponse = await dispatch(
             restaurantsApi.endpoints.getRestaurantProfile.initiate(undefined, { forceRefetch: true })
           ).unwrap();
-          if (profileResponse?.restaurantId) {
+          if (profileResponse?.restaurantId && profileResponse.status !== 'APPROVED') {
             dispatch(
               setRestaurantCreated({
                 restaurantId: profileResponse.restaurantId,
                 status: profileResponse.status ?? 'PENDING',
               }),
             );
+            dispatch(setActiveRestaurantId(profileResponse.restaurantId));
             dispatch(clearIsNewUser());
             navigation.replace('RestaurantDocuments');
             return;
@@ -514,6 +542,25 @@ export function RestaurantRegistrationScreen({ navigation }: Props) {
       >
         {/* Brand Banner Header (Matches Dashboard Header) */}
         <View style={[styles.headerCard, { paddingTop: Math.max(20, insets.top) }]}>
+          {navigation?.canGoBack?.() ? (
+            <Pressable
+              onPress={() => navigation.goBack()}
+              accessibilityRole="button"
+              accessibilityLabel="Back to Profile"
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                marginBottom: 12,
+                alignSelf: 'flex-start',
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 16 }}>?</Text>
+              <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700' }}>
+                Back to Profile
+              </Text>
+            </Pressable>
+          ) : null}
           <View style={styles.headerRow}>
             <View style={{ flex: 1, gap: 4 }}>
               <Text style={styles.headerBadge}>FOODIE PARTNER ONBOARDING</Text>

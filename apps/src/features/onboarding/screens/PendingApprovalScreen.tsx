@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -16,7 +16,9 @@ import {
 import {
   useGetRestaurantProfileQuery,
   useResubmitRestaurantMutation,
+  useGetMyRestaurantsQuery,
 } from '../../../api/endpoints/restaurantsApi';
+import { SwitchRestaurantModal } from '../../profile/components/SwitchRestaurantModal';
 import { useAppDispatch } from '../../../store/hooks';
 import { clearIsNewUser } from '../../auth/authSlice';
 import { OnboardingStepper } from '../components/OnboardingStepper';
@@ -40,6 +42,8 @@ export function PendingApprovalScreen({ navigation }: Props) {
   });
 
   const [resubmit, { isLoading: isResubmitting }] = useResubmitRestaurantMutation();
+  const [switchModalVisible, setSwitchModalVisible] = useState(false);
+  const { data: myRestaurants } = useGetMyRestaurantsQuery(undefined, { refetchOnFocus: true });
 
   useEffect(() => {
     trackAnalyticsEvent('restaurant_pending_approval_viewed');
@@ -260,8 +264,95 @@ export function PendingApprovalScreen({ navigation }: Props) {
           </View>
         ) : null}
 
+        {/* Live Dashboard Button if this restaurant is Approved */}
+        {status === 'APPROVED' ? (
+          <View style={{ marginTop: 12 }}>
+            <Pressable
+              style={({ pressed }) => [
+                {
+                  backgroundColor: BRAND_PRIMARY,
+                  borderRadius: 16,
+                  paddingVertical: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'row',
+                  gap: 8,
+                },
+                pressed && { opacity: 0.85 },
+              ]}
+              onPress={() => {
+                try {
+                  (navigation as any).navigate('Dashboard');
+                } catch {
+                  try {
+                    (navigation as any).navigate('RestaurantProfile');
+                  } catch {
+                    if (navigation.canGoBack()) navigation.goBack();
+                  }
+                }
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '800' }}>
+                🚀 Go to Live Dashboard →
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* Switch Restaurant Button if multiple restaurants registered */}
+        {Array.isArray(myRestaurants) && myRestaurants.length > 1 ? (
+          <View style={{ marginTop: 12 }}>
+            <Pressable
+              style={({ pressed }) => [
+                {
+                  backgroundColor: status === 'APPROVED' ? '#FFFFFF' : BRAND_PRIMARY,
+                  borderRadius: 16,
+                  paddingVertical: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'row',
+                  gap: 8,
+                  borderWidth: status === 'APPROVED' ? 1.5 : 0,
+                  borderColor: status === 'APPROVED' ? BRAND_PRIMARY : 'transparent',
+                },
+                pressed && { opacity: 0.85 },
+              ]}
+              onPress={() => setSwitchModalVisible(true)}
+            >
+              <Text style={{ color: status === 'APPROVED' ? BRAND_PRIMARY : '#FFFFFF', fontSize: 15, fontWeight: '800' }}>
+                🔁 Switch Restaurant ({myRestaurants.length} Registered)
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* Back / Return to Dashboard if can go back */}
+        {navigation?.canGoBack?.() ? (
+          <View style={{ marginTop: 8 }}>
+            <Pressable
+              style={({ pressed }) => [
+                {
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 16,
+                  paddingVertical: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                },
+                pressed && { backgroundColor: '#F1F5F9' },
+              ]}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={{ color: BRAND_PRIMARY, fontSize: 15, fontWeight: '800' }}>
+                ← Return to Profile
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         {/* Global Logout Button */}
-        <View style={{ marginTop: 24, paddingVertical: 12 }}>
+        <View style={{ marginTop: 16, paddingVertical: 12 }}>
           <Pressable
             style={({ pressed }) => [
               {
@@ -283,6 +374,35 @@ export function PendingApprovalScreen({ navigation }: Props) {
           </Pressable>
         </View>
       </ScrollView>
+
+      <SwitchRestaurantModal
+        visible={switchModalVisible}
+        onClose={() => setSwitchModalVisible(false)}
+        onSelectRestaurant={(resto) => {
+          if (resto.status === 'APPROVED') {
+            try {
+              (navigation as any).navigate('Dashboard');
+            } catch {
+              try {
+                (navigation as any).navigate('RestaurantProfile');
+              } catch {
+                if (navigation.canGoBack()) navigation.goBack();
+              }
+            }
+          } else if (resto.status === 'ONBOARDING') {
+            try {
+              (navigation as any).navigate('RestaurantDocuments');
+            } catch {
+              // ignore
+            }
+          } else {
+            void query.refetch();
+          }
+        }}
+        onAddAnotherRestaurant={() => {
+          navigation.navigate('RestaurantRegistration');
+        }}
+      />
     </View>
   );
 }

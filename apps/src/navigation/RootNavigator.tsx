@@ -9,7 +9,7 @@ import { AuthNavigator } from './AuthNavigator';
 import { MainNavigator } from './MainNavigator';
 import { linking } from './linking';
 import type { RootStackParamList } from './types';
-import { useGetRestaurantProfileQuery } from '../api/endpoints/restaurantsApi';
+import { useGetRestaurantProfileQuery, useGetMyRestaurantsQuery } from '../api/endpoints/restaurantsApi';
 import { setRestaurantStatus, setRestaurantCreated } from '../features/onboarding/restaurantOnboardingSlice';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -17,6 +17,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 function AuthenticatedNavigator() {
   const dispatch = useAppDispatch();
   const { data, isLoading, isFetching } = useGetRestaurantProfileQuery();
+  const { data: myRestaurants } = useGetMyRestaurantsQuery(undefined, { skip: isLoading });
 
   React.useEffect(() => {
     if (data) {
@@ -33,7 +34,8 @@ function AuthenticatedNavigator() {
     return <SplashScreen />;
   }
 
-  const isApproved = data?.status === 'APPROVED';
+  const hasApprovedRestaurant = myRestaurants?.some((r) => r.status === 'APPROVED');
+  const isApproved = data?.status === 'APPROVED' || Boolean(hasApprovedRestaurant);
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -69,4 +71,3 @@ export function RootNavigator() {
     </NavigationContainer>
   );
 }
-

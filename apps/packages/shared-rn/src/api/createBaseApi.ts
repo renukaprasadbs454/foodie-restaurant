@@ -97,9 +97,17 @@ export function createBaseApi<TagTypes extends string = string>(
   const rawBaseQuery = fetchBaseQuery({
     baseUrl: config.baseUrl.replace(/\/$/, ''),
     prepareHeaders: (headers, { getState }) => {
-      const token = config.getAccessToken(getState());
+      const state = getState() as any;
+      const token = config.getAccessToken(state);
       if (token) {
         headers.set('Authorization', `Bearer ${String(token)}`);
+      }
+      const activeRestId = state?.restaurantOnboarding?.activeRestaurantId || state?.restaurantOnboarding?.restaurantId;
+      const explicitHeader = headers.get('X-Restaurant-Id');
+      if (explicitHeader === '' || explicitHeader === 'none') {
+        headers.delete('X-Restaurant-Id');
+      } else if (activeRestId && !headers.has('X-Restaurant-Id')) {
+        headers.set('X-Restaurant-Id', String(activeRestId));
       }
       headers.set('Accept', 'application/json');
       headers.set('Bypass-Tunnel-Reminder', 'true');

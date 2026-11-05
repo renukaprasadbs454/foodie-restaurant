@@ -39,6 +39,7 @@ import {
   setRestaurantCreated,
 } from '../../onboarding/restaurantOnboardingSlice';
 import { RestaurantSupportModal } from '../components/RestaurantSupportModal';
+import { MyRestaurantsCard } from '../components/MyRestaurantsCard';
 import {
   CUISINE_TYPES,
   type CuisineType,
@@ -287,6 +288,11 @@ export function RestaurantProfileScreen({ navigation }: Props) {
     setCoverUri(profileData.coverImageUrl ?? null);
     setHydrated(true);
   }, [profileData, hydrated]);
+
+  useEffect(() => {
+    setHydrated(false);
+    setLocalProfile(null);
+  }, [restaurantId]);
 
   useEffect(() => {
     if (!query.data && !isUsingMock) setHydrated(false);
@@ -619,6 +625,20 @@ export function RestaurantProfileScreen({ navigation }: Props) {
                 </View>
               </View>
             </Card>
+
+            {/* MY RESTAURANTS SECTION */}
+            <MyRestaurantsCard
+              onAddAnotherRestaurant={() => {
+                navigation.navigate('RestaurantRegistration', { isAddingAnother: true });
+              }}
+              onNavigateToPending={() => {
+                navigation.navigate('PendingApproval');
+              }}
+              onNavigateToDocuments={() => {
+                navigation.navigate('RestaurantDocuments');
+              }}
+              onToast={(t) => setToast(t)}
+            />
 
             {/* BRANDING & CONTACT DETAILS CARD */}
             <Card style={{ padding: tokens.spacing.md, gap: tokens.spacing.sm, borderRadius: 14 }}>

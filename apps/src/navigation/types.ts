@@ -7,7 +7,7 @@ export type AuthStackParamList = {
 };
 
 export type OnboardingStackParamList = {
-  RestaurantRegistration: undefined;
+  RestaurantRegistration: { isAddingAnother?: boolean } | undefined;
   RestaurantDocuments: undefined;
   RestaurantImages: undefined;
   PendingApproval: undefined;
@@ -35,6 +35,7 @@ export type ProfileStackParamList = {
   BankAndBusinessDetails: undefined;
   RestaurantLocation: undefined;
   SettlementHistory: undefined;
+  RestaurantRegistration: { isAddingAnother?: boolean } | undefined;
   RestaurantDocuments: undefined;
   RestaurantImages: undefined;
   PendingApproval: undefined;

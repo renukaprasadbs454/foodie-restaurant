@@ -12,7 +12,7 @@ import { NavigationProvider } from './providers/NavigationProvider';
 import { ReduxProvider } from './providers/ReduxProvider';
 import { ThemeProvider } from './providers/ThemeProvider';
 
-type BoundaryState = { hasError: boolean };
+type BoundaryState = { hasError: boolean; error?: Error };
 
 class RootErrorBoundary extends Component<
   { children: ReactNode },
@@ -20,13 +20,13 @@ class RootErrorBoundary extends Component<
 > {
   override state: BoundaryState = { hasError: false };
 
-  static getDerivedStateFromError(): BoundaryState {
-    return { hasError: true };
+  static getDerivedStateFromError(error: Error): BoundaryState {
+    return { hasError: true, error };
   }
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
     captureCrashException(error, { screenName: 'RootErrorBoundary' });
-    console.error(info.componentStack);
+    console.error('RootErrorBoundary caught error:', error, info.componentStack);
   }
 
   override render(): ReactNode {
@@ -34,7 +34,12 @@ class RootErrorBoundary extends Component<
       return (
         <ErrorBoundaryFallback
           variant="root"
-          onAction={() => this.setState({ hasError: false })}
+          description={
+            this.state.error?.message
+              ? ('Error: ' + this.state.error.message)
+              : 'Please try again. If the problem continues, restart the app.'
+          }
+          onAction={() => this.setState({ hasError: false, error: undefined })}
         />
       );
     }

@@ -10,6 +10,7 @@ import { VariantsScreen } from '../features/menu/screens/VariantsScreen';
 import { PendingApprovalScreen } from '../features/onboarding/screens/PendingApprovalScreen';
 import { RestaurantDocumentsScreen } from '../features/onboarding/screens/RestaurantDocumentsScreen';
 import { RestaurantImagesScreen } from '../features/onboarding/screens/RestaurantImagesScreen';
+import { RestaurantRegistrationScreen } from '../features/onboarding/screens/RestaurantRegistrationScreen';
 import { DashboardScreen } from '../features/orders/screens/DashboardScreen';
 import { IncomingOrdersScreen } from '../features/orders/screens/IncomingOrdersScreen';
 import { RestaurantOrderDetailsScreen } from '../features/orders/screens/RestaurantOrderDetailsScreen';
@@ -155,6 +156,11 @@ function ProfileStackNavigator() {
         name="SettlementHistory"
         component={SettlementHistoryScreen}
         options={{ title: 'Payment & Settlements' }}
+      />
+      <ProfileStack.Screen
+        name="RestaurantRegistration"
+        component={RestaurantRegistrationScreen}
+        options={{ title: 'Register Another Restaurant' }}
       />
       <ProfileStack.Screen
         name="RestaurantDocuments"
