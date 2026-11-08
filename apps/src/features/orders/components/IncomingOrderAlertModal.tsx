@@ -80,19 +80,27 @@ export function IncomingOrderAlertModal({
                                 void ctx.resume();
                             }
                             const now = ctx.currentTime;
-                            // 3-tone pleasant kitchen order chime: G5 -> C6 -> E6
-                            const notes = [783.99, 1046.50, 1318.51];
-                            notes.forEach((freq, idx) => {
+                            // Swiggy 6-note signature chime motif: G5 -> B5 -> D6 -> G6 -> D6 -> G6
+                            const notes = [
+                                { freq: 783.99, delay: 0.0, dur: 0.12 },
+                                { freq: 987.77, delay: 0.12, dur: 0.12 },
+                                { freq: 1174.66, delay: 0.24, dur: 0.12 },
+                                { freq: 1567.98, delay: 0.36, dur: 0.22 },
+                                { freq: 1174.66, delay: 0.60, dur: 0.12 },
+                                { freq: 1567.98, delay: 0.72, dur: 0.35 },
+                            ];
+                            notes.forEach(({ freq, delay, dur }) => {
                                 const osc = ctx.createOscillator();
                                 const gain = ctx.createGain();
-                                osc.type = 'sine';
-                                osc.frequency.setValueAtTime(freq, now + idx * 0.12);
-                                gain.gain.setValueAtTime(0.3, now + idx * 0.12);
-                                gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.35);
+                                osc.type = 'triangle';
+                                osc.frequency.setValueAtTime(freq, now + delay);
+                                gain.gain.setValueAtTime(0.001, now + delay);
+                                gain.gain.linearRampToValueAtTime(0.7, now + delay + 0.02);
+                                gain.gain.exponentialRampToValueAtTime(0.001, now + delay + dur);
                                 osc.connect(gain);
                                 gain.connect(ctx.destination);
-                                osc.start(now + idx * 0.12);
-                                osc.stop(now + idx * 0.12 + 0.35);
+                                osc.start(now + delay);
+                                osc.stop(now + delay + dur);
                             });
                         } catch (e) {}
 
@@ -108,7 +116,7 @@ export function IncomingOrderAlertModal({
                     };
 
                     playChime();
-                    intervalId = setInterval(playChime, 1500);
+                    intervalId = setInterval(playChime, 1800);
                 }
             }
         } catch (e) {}
