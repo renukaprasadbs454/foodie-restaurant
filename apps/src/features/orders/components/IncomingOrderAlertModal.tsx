@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Pressable, ScrollView, Vibration } from 'react-native';
+import { View, Pressable, ScrollView, Vibration, Platform } from 'react-native';
+import { Audio } from 'expo-av';
 import { Button, Modal, Text, useTheme } from 'foodie-shared-rn';
 import type { OrderSummary } from '../types';
 import { formatMoney } from '../types';
@@ -15,6 +16,20 @@ type Props = {
 };
 
 const BRAND_PRIMARY = '#14532D';
+
+async function configureNativeAudioMode(): Promise<void> {
+    if (Platform.OS === 'web') return;
+    try {
+        await Audio.setAudioModeAsync({
+            playsInSilentModeIOS: true,
+            staysActiveInBackground: true,
+            shouldDuckAndroid: false,
+            playThroughEarpieceAndroid: false,
+        });
+    } catch (e) {
+        console.warn('[RestaurantAlert] Audio mode configuration warning:', e);
+    }
+}
 
 export function IncomingOrderAlertModal({
     order,
@@ -45,6 +60,7 @@ export function IncomingOrderAlertModal({
         let ctx: any = null;
         let bufferSource: any = null;
         let htmlAudio: any = null;
+        let nativeSound: Audio.Sound | null = null;
         let isActive = true;
 
         const stopAlert = () => {
@@ -67,6 +83,13 @@ export function IncomingOrderAlertModal({
                 } catch (e) {}
                 bufferSource = null;
             }
+            if (nativeSound) {
+                try {
+                    void nativeSound.stopAsync();
+                    void nativeSound.unloadAsync();
+                } catch (e) {}
+                nativeSound = null;
+            }
             try {
                 if (ctx && ctx.state !== 'closed') {
                     void ctx.close();
@@ -84,34 +107,85 @@ export function IncomingOrderAlertModal({
 
         stopAlertRef.current = stopAlert;
 
-        // 1. Play authentic Swiggy MP3 loop via HTML5 Audio
-        try {
-            if (typeof window !== 'undefined') {
-                htmlAudio = new (window as any).Audio(SWIGGY_RING_MP3_BASE64);
-                htmlAudio.loop = true;
-                htmlAudio.volume = 1.0;
-                const p = htmlAudio.play();
-                if (p !== undefined) {
-                    p.catch((err: any) => {
-                        console.warn('[RestaurantAlert] HTML5 Audio autoplay blocked, adding interaction unlock:', err);
-                        const unlock = () => {
-                            if (htmlAudio && isActive && htmlAudio.paused) {
-                                htmlAudio.play().catch(() => {});
+        // 1. Play authentic Swiggy chime audio
+        if (Platform.OS === 'web') {
+            // Web / Chrome laptop: Use HTML5 Audio loop
+            try {
+                if (typeof window !== 'undefined') {
+                    htmlAudio = new (window as any).Audio(SWIGGY_RING_MP3_BASE64);
+                    htmlAudio.loop = true;
+                    htmlAudio.volume = 1.0;
+                    const p = htmlAudio.play();
+                    if (p !== undefined) {
+                        p.catch((err: any) => {
+                            console.warn('[RestaurantAlert] HTML5 Audio autoplay blocked, adding interaction unlock:', err);
+                            const unlock = () => {
+                                if (htmlAudio && isActive && htmlAudio.paused) {
+                                    htmlAudio.play().catch(() => {});
+                                }
+                            };
+                            if (typeof document !== 'undefined') {
+                                document.addEventListener('click', unlock, { once: true });
+                                document.addEventListener('touchstart', unlock, { once: true });
+                                document.addEventListener('pointerdown', unlock, { once: true });
                             }
-                        };
-                        if (typeof document !== 'undefined') {
-                            document.addEventListener('click', unlock, { once: true });
-                            document.addEventListener('touchstart', unlock, { once: true });
-                            document.addEventListener('pointerdown', unlock, { once: true });
-                        }
-                    });
+                        });
+                    }
                 }
+            } catch (e) {
+                console.warn('[RestaurantAlert] Could not init HTML5 Audio:', e);
             }
-        } catch (e) {
-            console.warn('[RestaurantAlert] Could not init HTML5 Audio:', e);
+
+            // Fallback Web Audio: decode authentic Swiggy MP3 buffer and loop
+            try {
+                if (typeof window !== 'undefined') {
+                    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+                    if (AudioCtx) {
+                        ctx = new AudioCtx();
+                        if (ctx.state === 'suspended') {
+                            void ctx.resume();
+                        }
+                        const b64Data = SWIGGY_RING_MP3_BASE64.split('base64,')[1];
+                        const binaryStr = atob(b64Data);
+                        const bytes = new Uint8Array(binaryStr.length);
+                        for (let i = 0; i < binaryStr.length; i++) {
+                            bytes[i] = binaryStr.charCodeAt(i);
+                        }
+                        ctx.decodeAudioData(bytes.buffer.slice(0), (buffer: AudioBuffer) => {
+                            if (!isActive) return;
+                            if (htmlAudio && !htmlAudio.paused) return; // HTML5 audio is already playing cleanly
+                            const source = ctx.createBufferSource();
+                            source.buffer = buffer;
+                            source.loop = true;
+                            source.connect(ctx.destination);
+                            source.start(0);
+                            bufferSource = source;
+                        }, () => {});
+                    }
+                }
+            } catch (e) {}
+        } else {
+            // Mobile (Expo Go on Android / iOS): Use expo-av Native Audio
+            void configureNativeAudioMode();
+            void (async () => {
+                try {
+                    const { sound } = await Audio.Sound.createAsync(
+                        require('../../../../assets/swiggy_ring.wav'),
+                        { shouldPlay: true, isLooping: true, volume: 1.0 }
+                    );
+                    if (!isActive) {
+                        void sound.stopAsync();
+                        void sound.unloadAsync();
+                        return;
+                    }
+                    nativeSound = sound;
+                } catch (e) {
+                    console.warn('[RestaurantAlert] Native Audio.Sound failed:', e);
+                }
+            })();
         }
 
-        // 2. Continuous vibration pulse
+        // 2. Continuous vibration pulse (both mobile & web)
         try {
             Vibration.vibrate([0, 800, 400, 800, 400, 800], true);
         } catch (e) {}
@@ -121,40 +195,17 @@ export function IncomingOrderAlertModal({
             } catch (e) {}
         }
 
-        // 3. Fallback Web Audio: decode authentic Swiggy MP3 buffer and loop
-        try {
-            if (typeof window !== 'undefined') {
-                const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-                if (AudioCtx) {
-                    ctx = new AudioCtx();
-                    if (ctx.state === 'suspended') {
-                        void ctx.resume();
-                    }
-                    const b64Data = SWIGGY_RING_MP3_BASE64.split('base64,')[1];
-                    const binaryStr = atob(b64Data);
-                    const bytes = new Uint8Array(binaryStr.length);
-                    for (let i = 0; i < binaryStr.length; i++) {
-                        bytes[i] = binaryStr.charCodeAt(i);
-                    }
-                    ctx.decodeAudioData(bytes.buffer.slice(0), (buffer: AudioBuffer) => {
-                        if (!isActive) return;
-                        if (htmlAudio && !htmlAudio.paused) return; // HTML5 audio is already playing cleanly
-                        const source = ctx.createBufferSource();
-                        source.buffer = buffer;
-                        source.loop = true;
-                        source.connect(ctx.destination);
-                        source.start(0);
-                        bufferSource = source;
-                    }, () => {});
-                }
-            }
-        } catch (e) {}
-
-        // 4. Repeated check to ensure audio looping remains uninterrupted
+        // 3. Repeated interval check to keep ringtone playing until user accepts or rejects
         intervalId = setInterval(() => {
             if (!isActive) return;
-            if (htmlAudio && htmlAudio.paused) {
-                htmlAudio.play().catch(() => {});
+            if (Platform.OS === 'web') {
+                if (htmlAudio && htmlAudio.paused) {
+                    htmlAudio.play().catch(() => {});
+                }
+            } else {
+                try {
+                    Vibration.vibrate([0, 800, 400, 800], false);
+                } catch (e) {}
             }
         }, 1800);
 
