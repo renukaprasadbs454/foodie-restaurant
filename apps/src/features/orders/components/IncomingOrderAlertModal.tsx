@@ -43,6 +43,7 @@ export function IncomingOrderAlertModal({
 
         let intervalId: any = null;
         let ctx: any = null;
+        let bufferSource: any = null;
         let htmlAudio: any = null;
         let isActive = true;
 
@@ -58,6 +59,13 @@ export function IncomingOrderAlertModal({
                     htmlAudio.currentTime = 0;
                 } catch (e) {}
                 htmlAudio = null;
+            }
+            if (bufferSource) {
+                try {
+                    bufferSource.stop();
+                    bufferSource.disconnect();
+                } catch (e) {}
+                bufferSource = null;
             }
             try {
                 if (ctx && ctx.state !== 'closed') {
@@ -85,7 +93,17 @@ export function IncomingOrderAlertModal({
                 const p = htmlAudio.play();
                 if (p !== undefined) {
                     p.catch((err: any) => {
-                        console.warn('[RestaurantAlert] HTML5 Audio autoplay blocked, using Web Audio fallback:', err);
+                        console.warn('[RestaurantAlert] HTML5 Audio autoplay blocked, adding interaction unlock:', err);
+                        const unlock = () => {
+                            if (htmlAudio && isActive && htmlAudio.paused) {
+                                htmlAudio.play().catch(() => {});
+                            }
+                        };
+                        if (typeof document !== 'undefined') {
+                            document.addEventListener('click', unlock, { once: true });
+                            document.addEventListener('touchstart', unlock, { once: true });
+                            document.addEventListener('pointerdown', unlock, { once: true });
+                        }
                     });
                 }
             }
@@ -95,59 +113,50 @@ export function IncomingOrderAlertModal({
 
         // 2. Continuous vibration pulse
         try {
-            Vibration.vibrate([0, 600, 300, 600], true);
+            Vibration.vibrate([0, 800, 400, 800, 400, 800], true);
         } catch (e) {}
         if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
             try {
-                navigator.vibrate([600, 300, 600]);
+                navigator.vibrate([800, 400, 800, 400, 800]);
             } catch (e) {}
         }
 
-        // 3. Fallback Web Audio chime in case browser blocks HTML5 audio
+        // 3. Fallback Web Audio: decode authentic Swiggy MP3 buffer and loop
         try {
             if (typeof window !== 'undefined') {
                 const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
                 if (AudioCtx) {
                     ctx = new AudioCtx();
-
-                    const playChime = () => {
+                    if (ctx.state === 'suspended') {
+                        void ctx.resume();
+                    }
+                    const b64Data = SWIGGY_RING_MP3_BASE64.split('base64,')[1];
+                    const binaryStr = atob(b64Data);
+                    const bytes = new Uint8Array(binaryStr.length);
+                    for (let i = 0; i < binaryStr.length; i++) {
+                        bytes[i] = binaryStr.charCodeAt(i);
+                    }
+                    ctx.decodeAudioData(bytes.buffer.slice(0), (buffer: AudioBuffer) => {
                         if (!isActive) return;
-                        if (htmlAudio && !htmlAudio.paused) {
-                            return; // Authentic audio is already playing cleanly
-                        }
-                        try {
-                            if (ctx.state === 'suspended') {
-                                void ctx.resume();
-                            }
-                            const now = ctx.currentTime;
-                            const notes = [
-                                { freq: 783.99, delay: 0.0, dur: 0.12 },
-                                { freq: 987.77, delay: 0.12, dur: 0.12 },
-                                { freq: 1174.66, delay: 0.24, dur: 0.12 },
-                                { freq: 1567.98, delay: 0.36, dur: 0.22 },
-                                { freq: 1174.66, delay: 0.60, dur: 0.12 },
-                                { freq: 1567.98, delay: 0.72, dur: 0.35 },
-                            ];
-                            notes.forEach(({ freq, delay, dur }) => {
-                                const osc = ctx.createOscillator();
-                                const gain = ctx.createGain();
-                                osc.type = 'triangle';
-                                osc.frequency.setValueAtTime(freq, now + delay);
-                                gain.gain.setValueAtTime(0.001, now + delay);
-                                gain.gain.linearRampToValueAtTime(0.7, now + delay + 0.02);
-                                gain.gain.exponentialRampToValueAtTime(0.001, now + delay + dur);
-                                osc.connect(gain);
-                                gain.connect(ctx.destination);
-                                osc.start(now + delay);
-                                osc.stop(now + delay + dur);
-                            });
-                        } catch (e) {}
-                    };
-
-                    intervalId = setInterval(playChime, 1800);
+                        if (htmlAudio && !htmlAudio.paused) return; // HTML5 audio is already playing cleanly
+                        const source = ctx.createBufferSource();
+                        source.buffer = buffer;
+                        source.loop = true;
+                        source.connect(ctx.destination);
+                        source.start(0);
+                        bufferSource = source;
+                    }, () => {});
                 }
             }
         } catch (e) {}
+
+        // 4. Repeated check to ensure audio looping remains uninterrupted
+        intervalId = setInterval(() => {
+            if (!isActive) return;
+            if (htmlAudio && htmlAudio.paused) {
+                htmlAudio.play().catch(() => {});
+            }
+        }, 1800);
 
         return () => {
             stopAlert();
