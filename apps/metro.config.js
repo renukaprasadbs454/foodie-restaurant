@@ -6,7 +6,7 @@ const sharedRnRoot = path.resolve(projectRoot, 'packages/shared-rn');
 
 const config = getDefaultConfig(projectRoot);
 
-config.watchFolders = [projectRoot, sharedRnRoot];
+config.watchFolders = [projectRoot];
 
 config.resolver.nodeModulesPaths = [
     path.resolve(projectRoot, 'node_modules'),
