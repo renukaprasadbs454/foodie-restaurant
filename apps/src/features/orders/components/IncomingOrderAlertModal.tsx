@@ -166,8 +166,9 @@ export function IncomingOrderAlertModal({
             } catch (e) {}
         } else {
             // Mobile (Expo Go on Android / iOS): Use expo-av Native Audio
-            void configureNativeAudioMode();
             void (async () => {
+                await configureNativeAudioMode();
+                if (!isActive) return;
                 try {
                     const { sound } = await Audio.Sound.createAsync(
                         require('../../../../assets/swiggy_ring.wav'),
@@ -179,6 +180,7 @@ export function IncomingOrderAlertModal({
                         return;
                     }
                     nativeSound = sound;
+                    await sound.playAsync();
                 } catch (e) {
                     console.warn('[RestaurantAlert] Native Audio.Sound failed:', e);
                 }
@@ -206,6 +208,13 @@ export function IncomingOrderAlertModal({
                 try {
                     Vibration.vibrate([0, 800, 400, 800], false);
                 } catch (e) {}
+                if (nativeSound) {
+                    nativeSound.getStatusAsync().then((status) => {
+                        if (status.isLoaded && !status.isPlaying && isActive) {
+                            void nativeSound?.playAsync();
+                        }
+                    }).catch(() => {});
+                }
             }
         }, 1800);
 
