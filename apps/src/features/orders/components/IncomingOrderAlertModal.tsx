@@ -5,6 +5,7 @@ import type { OrderSummary } from '../types';
 import { formatMoney } from '../types';
 import { useGetOrderQuery } from '../../../api/endpoints/ordersApi';
 import { SwipeButton } from '../../../components/SwipeButton';
+import { SWIGGY_RING_MP3_BASE64 } from '../../../utils/swiggyRingData';
 
 type Props = {
     order: OrderSummary | null;
@@ -33,7 +34,7 @@ export function IncomingOrderAlertModal({
     const items: any[] = (detail as any)?.items ?? (order as any)?.items ?? [];
     const customerName = (detail as any)?.customerName ?? (order as any)?.customerName ?? 'Verified Customer';
 
-    // Continuous alert sound and vibration effect using Web Audio API + Vibration
+    // Continuous alert sound and vibration effect using authentic Swiggy chime audio
     useEffect(() => {
         if (!visible || !order) {
             stopAlertRef.current();
@@ -42,6 +43,7 @@ export function IncomingOrderAlertModal({
 
         let intervalId: any = null;
         let ctx: any = null;
+        let htmlAudio: any = null;
         let isActive = true;
 
         const stopAlert = () => {
@@ -49,6 +51,13 @@ export function IncomingOrderAlertModal({
             if (intervalId) {
                 clearInterval(intervalId);
                 intervalId = null;
+            }
+            if (htmlAudio) {
+                try {
+                    htmlAudio.pause();
+                    htmlAudio.currentTime = 0;
+                } catch (e) {}
+                htmlAudio = null;
             }
             try {
                 if (ctx && ctx.state !== 'closed') {
@@ -67,6 +76,34 @@ export function IncomingOrderAlertModal({
 
         stopAlertRef.current = stopAlert;
 
+        // 1. Play authentic Swiggy MP3 loop via HTML5 Audio
+        try {
+            if (typeof window !== 'undefined') {
+                htmlAudio = new (window as any).Audio(SWIGGY_RING_MP3_BASE64);
+                htmlAudio.loop = true;
+                htmlAudio.volume = 1.0;
+                const p = htmlAudio.play();
+                if (p !== undefined) {
+                    p.catch((err: any) => {
+                        console.warn('[RestaurantAlert] HTML5 Audio autoplay blocked, using Web Audio fallback:', err);
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn('[RestaurantAlert] Could not init HTML5 Audio:', e);
+        }
+
+        // 2. Continuous vibration pulse
+        try {
+            Vibration.vibrate([0, 600, 300, 600], true);
+        } catch (e) {}
+        if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+            try {
+                navigator.vibrate([600, 300, 600]);
+            } catch (e) {}
+        }
+
+        // 3. Fallback Web Audio chime in case browser blocks HTML5 audio
         try {
             if (typeof window !== 'undefined') {
                 const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -75,12 +112,14 @@ export function IncomingOrderAlertModal({
 
                     const playChime = () => {
                         if (!isActive) return;
+                        if (htmlAudio && !htmlAudio.paused) {
+                            return; // Authentic audio is already playing cleanly
+                        }
                         try {
                             if (ctx.state === 'suspended') {
                                 void ctx.resume();
                             }
                             const now = ctx.currentTime;
-                            // Swiggy 6-note signature chime motif: G5 -> B5 -> D6 -> G6 -> D6 -> G6
                             const notes = [
                                 { freq: 783.99, delay: 0.0, dur: 0.12 },
                                 { freq: 987.77, delay: 0.12, dur: 0.12 },
@@ -103,19 +142,8 @@ export function IncomingOrderAlertModal({
                                 osc.stop(now + delay + dur);
                             });
                         } catch (e) {}
-
-                        // Accompany with physical vibration pulse
-                        try {
-                            Vibration.vibrate([0, 400, 200, 400], false);
-                        } catch (e) {}
-                        if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-                            try {
-                                navigator.vibrate([400, 200, 400]);
-                            } catch (e) {}
-                        }
                     };
 
-                    playChime();
                     intervalId = setInterval(playChime, 1800);
                 }
             }
