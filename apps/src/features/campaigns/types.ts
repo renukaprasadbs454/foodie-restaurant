@@ -259,10 +259,15 @@ export function isAllLocationsCoupon(coupon: any): boolean {
  */
 export function isZoneMatching(couponZone?: string | null, restaurantZone?: string | null): boolean {
   if (!restaurantZone) return false; // Rule: Do not show coupons if the restaurant's zone cannot be verified
+  if (!couponZone) return false; // Rule: Do not assume a missing zone ID means All Locations
+
+  const cRaw = couponZone.trim().toLowerCase();
+  const rRaw = restaurantZone.trim().toLowerCase();
+  if (cRaw === rRaw) return true;
+
   const rCanonical = canonicalZoneId(restaurantZone);
   if (!rCanonical) return false;
 
-  if (!couponZone) return false; // Rule: Do not assume a missing zone ID means All Locations
   const cCanonical = canonicalZoneId(couponZone);
   if (!cCanonical) return false;
 
@@ -281,15 +286,15 @@ export function resolveRestaurantZone(profile?: any): string {
     return canonicalZoneId(profile);
   }
 
-  // 1. Direct assigned zone ID from restaurant profile
-  if (profile.zoneId && typeof profile.zoneId === 'string' && profile.zoneId.trim()) {
-    const canonical = canonicalZoneId(profile.zoneId);
+  // 1. Direct assigned zone name from restaurant profile (e.g. "Tumkur Zone", "Bangalore Zone")
+  if (profile.zoneName && typeof profile.zoneName === 'string' && profile.zoneName.trim()) {
+    const canonical = canonicalZoneId(profile.zoneName);
     if (canonical) return canonical;
   }
 
-  // 2. Direct assigned zone name from restaurant profile
-  if (profile.zoneName && typeof profile.zoneName === 'string' && profile.zoneName.trim()) {
-    const canonical = canonicalZoneId(profile.zoneName);
+  // 2. Direct assigned zone ID from restaurant profile
+  if (profile.zoneId && typeof profile.zoneId === 'string' && profile.zoneId.trim()) {
+    const canonical = canonicalZoneId(profile.zoneId);
     if (canonical) return canonical;
   }
 
@@ -352,6 +357,58 @@ export function normalizeCoupon(raw: any): RestaurantCoupon {
 }
 
 /**
+ * Resolves the restaurant coupon active status adhering strictly to:
+ * 1. Explicit restaurant enable/disable choice from local storage or mutation.
+ * 2. Explicit restaurant activation from backend/BFF (enabledRestaurantIds, restaurantStatuses).
+ * 3. Default to DISABLED (false) for newly received admin-created restaurant coupons.
+ */
+export function resolveRestaurantCouponActive(
+  coupon: any,
+  restaurantId: string,
+  storedToggles?: Record<string, boolean> | null,
+): boolean {
+  if (!coupon || !restaurantId) return false;
+  const id = coupon.couponId ? String(coupon.couponId).trim() : '';
+  const code = coupon.code ? String(coupon.code).trim().toUpperCase() : '';
+  const cleanRest = restaurantId.trim().toLowerCase();
+
+  // 1. Explicit restaurant toggle from storage / user action
+  if (storedToggles && typeof storedToggles === 'object') {
+    if (id && typeof storedToggles[id] === 'boolean') {
+      return storedToggles[id];
+    }
+    if (code && typeof storedToggles[code] === 'boolean') {
+      return storedToggles[code];
+    }
+  }
+
+  // 2. Explicit per-restaurant status from BFF / backend
+  if (coupon.restaurantStatuses && typeof coupon.restaurantStatuses === 'object') {
+    const val = coupon.restaurantStatuses[cleanRest] ?? coupon.restaurantStatuses[restaurantId];
+    if (typeof val === 'boolean') {
+      return val;
+    }
+  }
+
+  // 3. Explicit list of enabled restaurant IDs from BFF / backend
+  if (Array.isArray(coupon.enabledRestaurantIds)) {
+    const isExplicitlyEnabled = coupon.enabledRestaurantIds.some(
+      (r: string) => typeof r === 'string' && r.trim().toLowerCase() === cleanRest,
+    );
+    if (isExplicitlyEnabled) return true;
+  }
+  if (Array.isArray(coupon.disabledRestaurantIds)) {
+    const isExplicitlyDisabled = coupon.disabledRestaurantIds.some(
+      (r: string) => typeof r === 'string' && r.trim().toLowerCase() === cleanRest,
+    );
+    if (isExplicitlyDisabled) return false;
+  }
+
+  // 4. Default: all newly received admin-created restaurant coupons must remain DISABLED by default
+  return false;
+}
+
+/**
  * Enforces strict restaurant data and zone isolation.
  * - Restaurant A can only view and manage its own assigned coupons.
  * - Tumkur restaurants only see Tumkur coupons + All Locations coupons.
@@ -362,6 +419,7 @@ export function filterCouponsForRestaurant(
   coupons: any[],
   restaurantId: string,
   restaurantZone?: string | null,
+  storedToggles?: Record<string, boolean> | null,
 ): RestaurantCoupon[] {
   if (!Array.isArray(coupons) || !restaurantId || !restaurantId.trim()) {
     return [];
@@ -386,9 +444,35 @@ export function filterCouponsForRestaurant(
         return false;
       }
 
+      // 4. Exclude promo coupons, customer coupons, and platform-wide foodie promos
+      const cType = String(c.couponType || '').toUpperCase();
+      const fType = String(c.funderType || '').toUpperCase();
+      if (
+        cType === 'PROMO_COUPON' ||
+        cType === 'PROMO' ||
+        cType === 'CUSTOMER' ||
+        cType === 'NEW_USER' ||
+        cType === 'NEWLY_JOINED' ||
+        cType === 'REFERRAL' ||
+        cType === 'FIRST_ORDER'
+      ) {
+        return false;
+      }
+      if (
+        String(c.category || '').toUpperCase() === 'CUSTOMER' ||
+        String(c.targetAudience || '').toUpperCase() === 'CUSTOMER' ||
+        String(c.targetAudience || '').toUpperCase() === 'NEW_USERS' ||
+        String(c.targetAudience || '').toUpperCase() === 'NEWLY_JOINED'
+      ) {
+        return false;
+      }
+      if (cType === 'GENERIC' && fType === 'FOODIE' && !c.restaurantId && !c.module?.includes('Restaurant')) {
+        return false;
+      }
+
       const couponRestId = c.restaurantId ? String(c.restaurantId).trim() : null;
 
-      // 4. Restaurant data isolation: If assigned to a specific restaurant, must match cleanRestId
+      // 5. Restaurant data isolation: If assigned to a specific restaurant, must match cleanRestId
       if (couponRestId && couponRestId !== 'ALL') {
         if (couponRestId.toLowerCase() !== cleanRestId.toLowerCase()) {
           return false;
@@ -400,27 +484,23 @@ export function filterCouponsForRestaurant(
         return true;
       }
 
-      // 5. Zone coupons and All Locations coupons require a verified restaurant zone
+      // 6. Zone coupons and All Locations coupons require a verified restaurant zone
       // Rule: Do not show coupons if the restaurant's zone cannot be verified
       if (!cleanZone) {
         return false;
       }
 
-      // 6. All Locations coupons: visible to all eligible restaurants
+      // 7. All Locations coupons: visible to all eligible restaurants
       if (isAllLocationsCoupon(c)) {
         return true;
       }
 
-      // 7. Zone-specific coupons:
+      // 8. Zone-specific coupons:
       // Rule: Do not assume a missing zone ID means All Locations
-      const couponZone = c.zoneId || c.zoneName;
-      if (!couponZone) {
-        return false;
-      }
-
-      // Rule: Use actual zone IDs, not only zone names
-      // Tumkur restaurants see Tumkur coupons, Bangalore restaurants see Bangalore coupons
-      return isZoneMatching(couponZone, cleanZone);
+      // Match against coupon's zoneId OR zoneName
+      const matchesZoneId = Boolean(c.zoneId && isZoneMatching(c.zoneId, cleanZone));
+      const matchesZoneName = Boolean(c.zoneName && isZoneMatching(c.zoneName, cleanZone));
+      return matchesZoneId || matchesZoneName;
     });
 
   // De-duplicate coupons: prevent duplicate cards if multiple API responses or records exist
@@ -439,7 +519,14 @@ export function filterCouponsForRestaurant(
     if (idKey) seenIds.add(idKey);
     if (codeKey) seenCodes.add(codeKey);
 
-    deduped.push(normalized);
+    const isActive = storedToggles
+      ? resolveRestaurantCouponActive(raw, cleanRestId, storedToggles)
+      : normalized.isActive;
+
+    deduped.push({
+      ...normalized,
+      isActive,
+    });
   }
 
   return deduped;

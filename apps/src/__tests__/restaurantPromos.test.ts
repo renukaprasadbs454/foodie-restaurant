@@ -9,6 +9,7 @@ import {
   isCouponExpired,
   isZoneMatching,
   resolveRestaurantZone,
+  resolveRestaurantCouponActive,
   type RestaurantCoupon,
 } from '../features/campaigns/types';
 
@@ -740,5 +741,284 @@ describe('Admin-Created Restaurant Coupons in Promos - Performance & Persistence
     expect(promos.some((p) => p.code === 'FOODIE13')).toBe(false);
     expect(promos.some((p) => p.code === 'FOODIE15')).toBe(false);
     expect(promos.some((p) => p.code === 'FOODIE16')).toBe(false);
+  });
+
+  // 14. Strict exclusion of customer promo coupons and platform campaigns
+  it('14. Excludes Promo Coupons, customer-only coupons, and Foodie-funded generic coupons from Restaurant Promos', () => {
+    const mixedCampaigns = [
+      // Valid Restaurant coupon for Tumkur
+      {
+        couponId: 'c-rest-valid',
+        code: 'MAYURA_TUMKUR',
+        title: 'Mayura Special',
+        discountType: 'PERCENT',
+        value: 20,
+        minOrderAmount: 300,
+        expiryDate: '2026-12-31T23:59:59Z',
+        restaurantId: RESTAURANT_A_ID,
+        zoneId: 'dz-tumkur',
+        couponType: 'RESTAURANT',
+        funderType: 'MERCHANT',
+        isActive: false,
+        approvalStatus: 'APPROVED',
+      },
+      // Customer Promo Coupon created by Admin (for customer app checkout only)
+      {
+        couponId: 'c-promo-cust',
+        code: 'FOODIE50',
+        title: 'Foodie 50% Flat Off',
+        discountType: 'PERCENT',
+        value: 50,
+        minOrderAmount: 200,
+        expiryDate: '2026-12-31T23:59:59Z',
+        restaurantId: null,
+        zoneId: 'dz-tumkur',
+        couponType: 'PROMO_COUPON',
+        funderType: 'FOODIE',
+        isActive: true,
+        approvalStatus: 'APPROVED',
+      },
+      // Customer category coupon
+      {
+        couponId: 'c-cust-cat',
+        code: 'NEWUSER25',
+        title: 'New Customer Deal',
+        discountType: 'PERCENT',
+        value: 25,
+        minOrderAmount: 150,
+        expiryDate: '2026-12-31T23:59:59Z',
+        restaurantId: null,
+        category: 'CUSTOMER',
+        isActive: true,
+        approvalStatus: 'APPROVED',
+      },
+      // Unrelated coupon assigned to another restaurant
+      {
+        couponId: 'c-other-rest',
+        code: 'ROYAL_ONLY',
+        title: 'Royal Biryani Deal',
+        discountType: 'FLAT',
+        value: 50,
+        minOrderAmount: 200,
+        expiryDate: '2026-12-31T23:59:59Z',
+        restaurantId: RESTAURANT_B_ID,
+        couponType: 'RESTAURANT',
+        funderType: 'MERCHANT',
+        isActive: true,
+        approvalStatus: 'APPROVED',
+      },
+    ];
+
+    const promos = filterCouponsForRestaurant(mixedCampaigns, RESTAURANT_A_ID, 'dz-tumkur');
+
+    // ONLY the assigned restaurant coupon appears
+    expect(promos).toHaveLength(1);
+    expect(promos[0].code).toBe('MAYURA_TUMKUR');
+    expect(promos.some((c) => c.code === 'FOODIE50')).toBe(false);
+    expect(promos.some((c) => c.code === 'NEWUSER25')).toBe(false);
+    expect(promos.some((c) => c.code === 'ROYAL_ONLY')).toBe(false);
+  });
+
+  // 15. Newly received admin coupons remain DISABLED by default, and user toggles persist
+  it('15. All newly received admin coupons remain DISABLED by default and toggle state persists permanently', () => {
+    const rawAdminCoupons = [
+      {
+        couponId: 'c-admin-new-01',
+        code: 'NEW_ADMIN_DISCOUNT',
+        title: 'Admin Created Discount',
+        discountType: 'PERCENT',
+        value: 15,
+        minOrderAmount: 400,
+        expiryDate: '2026-12-31T23:59:59Z',
+        restaurantId: RESTAURANT_A_ID,
+        couponType: 'RESTAURANT',
+        funderType: 'MERCHANT',
+        isActive: true, // Super Admin created with isActive: true in DB
+        approvalStatus: 'APPROVED',
+      },
+      {
+        couponId: 'c-admin-new-02',
+        code: 'SECOND_ADMIN_DISCOUNT',
+        title: 'Second Discount',
+        discountType: 'FLAT',
+        value: 75,
+        minOrderAmount: 500,
+        expiryDate: '2026-12-31T23:59:59Z',
+        restaurantId: RESTAURANT_A_ID,
+        couponType: 'RESTAURANT',
+        funderType: 'MERCHANT',
+        isActive: true, // Super Admin created with isActive: true in DB
+        approvalStatus: 'APPROVED',
+      },
+    ];
+
+    // Initial state: Restaurant has not toggled any coupon yet (storedToggles = {})
+    const initialToggles: Record<string, boolean> = {};
+    const filteredInitial = filterCouponsForRestaurant(
+      rawAdminCoupons,
+      RESTAURANT_A_ID,
+      'dz-tumkur',
+      initialToggles,
+    );
+
+    // Rule 3: All newly received admin-created restaurant coupons must remain DISABLED by default!
+    expect(filteredInitial).toHaveLength(2);
+    expect(filteredInitial[0].isActive).toBe(false);
+    expect(filteredInitial[1].isActive).toBe(false);
+
+    // Restaurant toggles c-admin-new-01 to ENABLED (isActive: true)
+    const updatedToggles: Record<string, boolean> = {
+      'c-admin-new-01': true,
+      NEW_ADMIN_DISCOUNT: true,
+    };
+
+    const reloaded = filterCouponsForRestaurant(
+      rawAdminCoupons,
+      RESTAURANT_A_ID,
+      'dz-tumkur',
+      updatedToggles,
+    );
+
+    // c-admin-new-01 is now ENABLED, and c-admin-new-02 remains DISABLED
+    const c1 = reloaded.find((c) => c.couponId === 'c-admin-new-01');
+    const c2 = reloaded.find((c) => c.couponId === 'c-admin-new-02');
+    expect(c1?.isActive).toBe(true);
+    expect(c2?.isActive).toBe(false);
+  });
+
+  // 16. Multi-Restaurant Zone Assignment and Independent Activation Isolation
+  it('16. Super Admin zone coupons reach ALL restaurants in that zone with independent enable/disable isolation', () => {
+    const RESTAURANT_1_TUMKUR = 'rest-tumkur-001';
+    const RESTAURANT_2_TUMKUR = 'rest-tumkur-002';
+    const RESTAURANT_3_BLR = 'rest-blr-003';
+
+    // Super Admin creates a Tumkur Zone restaurant coupon
+    const pool = [
+      {
+        couponId: 'c-admin-tmk-zone',
+        code: 'TUMKUR_DELIGHT',
+        title: '20% OFF Tumkur Regional Delight',
+        discountType: 'PERCENT',
+        value: 20,
+        minOrderAmount: 300,
+        expiryDate: '2026-12-31T23:59:59Z',
+        restaurantId: null,
+        zoneId: 'dz-tumkur',
+        zoneName: 'Tumkur Zone',
+        couponType: 'RESTAURANT',
+        funderType: 'MERCHANT',
+        isActive: true,
+        approvalStatus: 'APPROVED',
+      },
+      {
+        couponId: 'c-admin-blr-zone',
+        code: 'BANGALORE_BITE',
+        title: 'Flat ₹100 Bangalore Treat',
+        discountType: 'FLAT',
+        value: 100,
+        minOrderAmount: 500,
+        expiryDate: '2026-12-31T23:59:59Z',
+        restaurantId: null,
+        zoneId: 'dz-bangalore',
+        zoneName: 'Bangalore Zone',
+        couponType: 'RESTAURANT',
+        funderType: 'MERCHANT',
+        isActive: true,
+        approvalStatus: 'APPROVED',
+      },
+    ];
+
+    // Rule 1: Available to ALL eligible restaurants in Tumkur Zone
+    const rest1Toggles: Record<string, boolean> = {};
+    const rest2Toggles: Record<string, boolean> = {};
+
+    const view1 = filterCouponsForRestaurant(pool, RESTAURANT_1_TUMKUR, 'dz-tumkur', rest1Toggles);
+    const view2 = filterCouponsForRestaurant(pool, RESTAURANT_2_TUMKUR, 'dz-tumkur', rest2Toggles);
+    const view3 = filterCouponsForRestaurant(pool, RESTAURANT_3_BLR, 'dz-bangalore', {});
+
+    // Both Tumkur restaurants see TUMKUR_DELIGHT
+    expect(view1.map((c) => c.code)).toEqual(['TUMKUR_DELIGHT']);
+    expect(view2.map((c) => c.code)).toEqual(['TUMKUR_DELIGHT']);
+    // Bangalore restaurant sees BANGALORE_BITE only
+    expect(view3.map((c) => c.code)).toEqual(['BANGALORE_BITE']);
+
+    // Rule 4: Default status must always be DISABLED
+    expect(view1[0].isActive).toBe(false);
+    expect(view2[0].isActive).toBe(false);
+
+    // Rule 5: Restaurant 1 ENABLES coupon -> Must NOT enable for Restaurant 2
+    rest1Toggles['TUMKUR_DELIGHT'] = true;
+
+    const updatedView1 = filterCouponsForRestaurant(pool, RESTAURANT_1_TUMKUR, 'dz-tumkur', rest1Toggles);
+    const updatedView2 = filterCouponsForRestaurant(pool, RESTAURANT_2_TUMKUR, 'dz-tumkur', rest2Toggles);
+
+    expect(updatedView1[0].isActive).toBe(true);
+    expect(updatedView2[0].isActive).toBe(false); // Isolated! Still disabled for Restaurant 2!
+  });
+
+  // 17. Dynamic matching for future zones and exclusion of Newly Joined / First Order user categories
+  it('17. Dynamic matching for future zones and eliminates Newly Joined user coupons', () => {
+    const dynamicCampaigns = [
+      // Future Zone: Mangalore Zone
+      {
+        couponId: 'c-mng-01',
+        code: 'MANGALORE_FISH',
+        title: 'Coastal Special',
+        discountType: 'PERCENT',
+        value: 15,
+        minOrderAmount: 250,
+        expiryDate: '2026-12-31T23:59:59Z',
+        restaurantId: null,
+        zoneId: 'dz-mangalore',
+        zoneName: 'Mangalore Zone',
+        couponType: 'RESTAURANT',
+        funderType: 'MERCHANT',
+        isActive: true,
+        approvalStatus: 'APPROVED',
+      },
+      // Newly Joined / First Order user campaign (must NEVER appear in restaurant promos)
+      {
+        couponId: 'c-newly-joined-01',
+        code: 'NEWJOIN50',
+        title: 'Newly Joined Customer Bonus',
+        discountType: 'PERCENT',
+        value: 50,
+        minOrderAmount: 100,
+        expiryDate: '2026-12-31T23:59:59Z',
+        restaurantId: null,
+        zoneId: 'dz-mangalore',
+        couponType: 'NEW_USER',
+        targetAudience: 'NEWLY_JOINED',
+        isActive: true,
+        approvalStatus: 'APPROVED',
+      },
+      // First order offer
+      {
+        couponId: 'c-fo-02',
+        code: 'FIRST_BITE',
+        title: 'First Order Discount',
+        discountType: 'FLAT',
+        value: 50,
+        minOrderAmount: 200,
+        expiryDate: '2026-12-31T23:59:59Z',
+        restaurantId: null,
+        zoneId: 'dz-mangalore',
+        couponType: 'FIRST_ORDER',
+        isActive: true,
+        approvalStatus: 'APPROVED',
+      },
+    ];
+
+    const REST_MANGALORE = 'rest-mng-999';
+    const promos = filterCouponsForRestaurant(dynamicCampaigns, REST_MANGALORE, 'dz-mangalore', {});
+
+    // Matches Mangalore dynamically
+    expect(promos).toHaveLength(1);
+    expect(promos[0].code).toBe('MANGALORE_FISH');
+    expect(promos[0].isActive).toBe(false); // Default disabled
+
+    // Newly Joined / First Order coupons are completely eliminated
+    expect(promos.some((c) => c.code === 'NEWJOIN50')).toBe(false);
+    expect(promos.some((c) => c.code === 'FIRST_BITE')).toBe(false);
   });
 });

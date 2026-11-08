@@ -37,8 +37,10 @@ export const CampaignsScreen = () => {
   } = useGetRestaurantCouponsQuery(
     { restaurantId, zoneId: restaurantZone },
     {
-      skip: !restaurantId || !restaurantZone,
-      pollingInterval: 3000, // Reactive automatic polling for newly published admin coupons
+      skip: !restaurantId,
+      pollingInterval: 15000,
+      refetchOnFocus: true,
+      refetchOnReconnect: true,
     },
   );
 

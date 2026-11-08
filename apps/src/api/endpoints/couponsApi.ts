@@ -53,6 +53,31 @@ function getCandidateBffUrls(): string[] {
 }
 
 const STORAGE_KEY_PREFIX = '@foodie:restaurant_coupons:';
+const TOGGLES_KEY_PREFIX = '@foodie:restaurant_coupon_toggles:';
+
+async function getStoredCouponToggles(restaurantId: string): Promise<Record<string, boolean>> {
+  try {
+    const raw = await AsyncStorage.getItem(`${TOGGLES_KEY_PREFIX}${restaurantId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') return parsed;
+    }
+  } catch {}
+  return {};
+}
+
+async function setStoredCouponToggle(
+  restaurantId: string,
+  couponIdOrCode: string,
+  isActive: boolean,
+): Promise<void> {
+  try {
+    const key = `${TOGGLES_KEY_PREFIX}${restaurantId}`;
+    const existing = await getStoredCouponToggles(restaurantId);
+    existing[couponIdOrCode] = isActive;
+    await AsyncStorage.setItem(key, JSON.stringify(existing));
+  } catch {}
+}
 
 export const couponsApi = baseApi.injectEndpoints({
   overrideExisting: true,
@@ -69,59 +94,68 @@ export const couponsApi = baseApi.injectEndpoints({
         let fetchedCoupons: any[] = [];
         let fetchedFromNetwork = false;
 
-        // 1. Parallel probe of candidate BFF endpoints (Admin Panel single source of truth prioritized)
-        try {
-          const fetchPromises = candidateBffUrls.flatMap((base) => {
-            const probeEndpoint = async (url: string) => {
-              const controller = new AbortController();
-              const timer = setTimeout(() => controller.abort(), 1500);
-              try {
-                const res = await fetch(url, {
-                  method: 'GET',
-                  headers: {
-                    Accept: 'application/json',
-                    'Cache-Control': 'no-cache, no-store, must-revalidate',
-                    Pragma: 'no-cache',
-                  },
-                  cache: 'no-store',
-                  signal: controller.signal,
-                });
-                clearTimeout(timer);
-                if (res.ok) {
-                  const json = await res.json();
-                  const list = json?.data ?? json;
-                  if (Array.isArray(list)) {
-                    cachedWorkingBffUrl = base;
-                    return list;
-                  }
-                }
-              } catch {
-                clearTimeout(timer);
-              }
-              throw new Error('Not reachable');
-            };
-
-            const queryParams = new URLSearchParams({
-              restaurantId: cleanRestId,
-              _t: String(Date.now()),
-            });
-            if (cleanZone) {
-              queryParams.set('zoneId', cleanZone);
-            }
-
-            return [
-              probeEndpoint(`${base}/api/bff/admin/coupons?_t=${Date.now()}`),
-              probeEndpoint(`${base}/api/bff/restaurant/coupons?${queryParams.toString()}`),
-            ];
-          });
-
-          fetchedCoupons = await Promise.any(fetchPromises);
-          fetchedFromNetwork = true;
-        } catch {
-          // BFF parallel fetch did not succeed, try remote backend
+        const queryParams = new URLSearchParams({
+          restaurantId: cleanRestId,
+          _t: String(Date.now()),
+        });
+        if (cleanZone) {
+          queryParams.set('zoneId', cleanZone);
         }
 
-        // 2. Query remote backend endpoint if BFF was unreachable
+        const probeEndpoint = async (base: string) => {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 1800);
+          try {
+            const res = await fetch(
+              `${base}/api/bff/restaurant/coupons?${queryParams.toString()}`,
+              {
+                method: 'GET',
+                headers: {
+                  Accept: 'application/json',
+                  'Cache-Control': 'no-cache, no-store, must-revalidate',
+                  Pragma: 'no-cache',
+                },
+                cache: 'no-store',
+                signal: controller.signal,
+              },
+            );
+            clearTimeout(timer);
+            if (res.ok) {
+              const json = await res.json();
+              const list = json?.data ?? json;
+              if (Array.isArray(list)) {
+                cachedWorkingBffUrl = base;
+                return list;
+              }
+            }
+          } catch {
+            clearTimeout(timer);
+          }
+          throw new Error('Not reachable');
+        };
+
+        // 1. Try cached working BFF URL first to prevent firing duplicate candidate requests
+        if (cachedWorkingBffUrl) {
+          try {
+            fetchedCoupons = await probeEndpoint(cachedWorkingBffUrl);
+            fetchedFromNetwork = true;
+          } catch {
+            cachedWorkingBffUrl = null;
+          }
+        }
+
+        // 2. Parallel probe candidate BFF endpoints if not yet fetched
+        if (!fetchedFromNetwork) {
+          try {
+            const candidates = candidateBffUrls.filter((u) => u !== cachedWorkingBffUrl);
+            fetchedCoupons = await Promise.any(candidates.map((base) => probeEndpoint(base)));
+            fetchedFromNetwork = true;
+          } catch {
+            // BFF parallel fetch did not succeed, try remote backend
+          }
+        }
+
+        // 3. Query remote backend endpoint if BFF was unreachable
         if (!fetchedFromNetwork) {
           try {
             const res = await baseQuery({
@@ -144,27 +178,40 @@ export const couponsApi = baseApi.injectEndpoints({
           }
         }
 
-        // 3. Strict Restaurant Data & Zone Isolation
-        const isolated = filterCouponsForRestaurant(fetchedCoupons, cleanRestId, cleanZone);
+        // 4. Strict Restaurant Data & Zone Isolation with persistent toggle resolution
+        const storedToggles = await getStoredCouponToggles(cleanRestId);
+        const isolated = filterCouponsForRestaurant(
+          fetchedCoupons,
+          cleanRestId,
+          cleanZone,
+          storedToggles,
+        );
 
-        // 4. Persistence management
+        // 5. Persistence management: only update local cache with non-empty network responses
         const storageKey = `${STORAGE_KEY_PREFIX}${cleanRestId}`;
         if (fetchedFromNetwork) {
-          try {
-            await AsyncStorage.setItem(storageKey, JSON.stringify(isolated));
-          } catch {
-            // Ignore storage write errors
+          if (isolated.length > 0) {
+            try {
+              await AsyncStorage.setItem(storageKey, JSON.stringify(isolated));
+            } catch {
+              // Ignore storage write errors
+            }
           }
           return { data: isolated };
         }
 
-        // 5. Offline fallback: load cached coupons strictly for this restaurant and zone
+        // 6. Offline fallback: load cached coupons strictly for this restaurant and zone
         try {
           const cached = await AsyncStorage.getItem(storageKey);
           if (cached) {
             const parsed = JSON.parse(cached);
-            if (Array.isArray(parsed)) {
-              const verified = filterCouponsForRestaurant(parsed, cleanRestId, cleanZone);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const verified = filterCouponsForRestaurant(
+                parsed,
+                cleanRestId,
+                cleanZone,
+                storedToggles,
+              );
               return { data: verified };
             }
           }
@@ -189,19 +236,20 @@ export const couponsApi = baseApi.injectEndpoints({
         const candidateBffUrls = getCandidateBffUrls();
         const action = isActive ? 'activate' : 'deactivate';
 
-        // 1. Fast parallel dispatch to BFF endpoints
+        // 1. Fast dispatch to BFF endpoint
         try {
           const fetchPromises = candidateBffUrls.map(async (base) => {
             const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 1200);
+            const timer = setTimeout(() => controller.abort(), 1500);
             try {
               const res = await fetch(
-                `${base}/api/bff/admin/coupons/${encodeURIComponent(couponId)}/${action}`,
+                `${base}/api/bff/restaurant/coupons/${encodeURIComponent(couponId)}/${action}?restaurantId=${encodeURIComponent(cleanRestId)}`,
                 {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json' },
                   cache: 'no-store',
                   signal: controller.signal,
+                  body: JSON.stringify({ restaurantId: cleanRestId }),
                 },
               );
               clearTimeout(timer);
@@ -223,20 +271,23 @@ export const couponsApi = baseApi.injectEndpoints({
         // 2. Also dispatch to remote backend if reachable
         try {
           await baseQuery({
-            url: `/api/v1/restaurant/coupons/${encodeURIComponent(couponId)}/status?isActive=${isActive}`,
+            url: `/api/v1/restaurant/coupons/${encodeURIComponent(couponId)}/status`,
             method: 'PATCH',
+            params: { isActive, restaurantId: cleanRestId },
           });
         } catch {
           try {
             await baseQuery({
               url: `/api/v1/restaurant/coupons/${encodeURIComponent(couponId)}/${action}`,
               method: 'PATCH',
+              params: { restaurantId: cleanRestId },
             });
           } catch {}
         }
 
-        // 3. Update persistent local storage for this restaurant immediately
+        // 3. Update persistent toggles and local storage for this restaurant immediately
         if (cleanRestId) {
+          await setStoredCouponToggle(cleanRestId, couponId, isActive);
           const storageKey = `${STORAGE_KEY_PREFIX}${cleanRestId}`;
           try {
             const cached = await AsyncStorage.getItem(storageKey);
