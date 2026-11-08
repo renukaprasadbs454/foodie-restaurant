@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { View, Pressable, ScrollView } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Pressable, ScrollView, Vibration } from 'react-native';
 import { Button, Modal, Text, useTheme } from 'foodie-shared-rn';
 import type { OrderSummary } from '../types';
 import { formatMoney } from '../types';
@@ -22,6 +22,7 @@ export function IncomingOrderAlertModal({
     onReject,
 }: Props) {
     const { tokens } = useTheme();
+    const stopAlertRef = useRef<() => void>(() => {});
 
     // Fetch full details (customer name & items)
     const detailQuery = useGetOrderQuery(order?.orderId ?? '', {
@@ -32,17 +33,45 @@ export function IncomingOrderAlertModal({
     const items: any[] = (detail as any)?.items ?? (order as any)?.items ?? [];
     const customerName = (detail as any)?.customerName ?? (order as any)?.customerName ?? 'Verified Customer';
 
-    // Continuous alert sound effect using Web Audio API (Pleasant 3-tone kitchen alert chime)
+    // Continuous alert sound and vibration effect using Web Audio API + Vibration
     useEffect(() => {
-        if (!visible || !order) return;
+        if (!visible || !order) {
+            stopAlertRef.current();
+            return;
+        }
 
-        let stopSound: (() => void) | undefined;
+        let intervalId: any = null;
+        let ctx: any = null;
+        let isActive = true;
+
+        const stopAlert = () => {
+            isActive = false;
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+            try {
+                if (ctx && ctx.state !== 'closed') {
+                    void ctx.close();
+                }
+            } catch (e) {}
+            try {
+                Vibration.cancel();
+            } catch (e) {}
+            if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+                try {
+                    navigator.vibrate(0);
+                } catch (e) {}
+            }
+        };
+
+        stopAlertRef.current = stopAlert;
+
         try {
             if (typeof window !== 'undefined') {
                 const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
                 if (AudioCtx) {
-                    const ctx = new AudioCtx();
-                    let isActive = true;
+                    ctx = new AudioCtx();
 
                     const playChime = () => {
                         if (!isActive) return;
@@ -65,25 +94,39 @@ export function IncomingOrderAlertModal({
                                 osc.start(now + idx * 0.12);
                                 osc.stop(now + idx * 0.12 + 0.35);
                             });
-                        } catch (e) { }
+                        } catch (e) {}
+
+                        // Accompany with physical vibration pulse
+                        try {
+                            Vibration.vibrate([0, 400, 200, 400], false);
+                        } catch (e) {}
+                        if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+                            try {
+                                navigator.vibrate([400, 200, 400]);
+                            } catch (e) {}
+                        }
                     };
 
                     playChime();
-                    const intervalId = setInterval(playChime, 1500);
-
-                    stopSound = () => {
-                        isActive = false;
-                        clearInterval(intervalId);
-                        try { ctx.close(); } catch (e) { }
-                    };
+                    intervalId = setInterval(playChime, 1500);
                 }
             }
-        } catch (e) { }
+        } catch (e) {}
 
         return () => {
-            if (stopSound) stopSound();
+            stopAlert();
         };
     }, [visible, order?.orderId]);
+
+    const handleAcceptOrder = (orderId: string) => {
+        stopAlertRef.current();
+        onAccept(orderId);
+    };
+
+    const handleRejectOrder = (orderId: string) => {
+        stopAlertRef.current();
+        onReject(orderId);
+    };
 
     if (!visible || !order) return null;
 
@@ -202,12 +245,12 @@ export function IncomingOrderAlertModal({
                     <SwipeButton
                         title="Accept Order"
                         backgroundColor={BRAND_PRIMARY}
-                        onSwipeSuccess={() => onAccept(order.orderId)}
+                        onSwipeSuccess={() => handleAcceptOrder(order.orderId)}
                     />
                     <SwipeButton
                         title="Reject Order"
                         backgroundColor="#DC2626"
-                        onSwipeSuccess={() => onReject(order.orderId)}
+                        onSwipeSuccess={() => handleRejectOrder(order.orderId)}
                     />
                 </View>
             </View>
