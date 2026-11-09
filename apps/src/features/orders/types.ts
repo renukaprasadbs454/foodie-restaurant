@@ -188,6 +188,9 @@ export function restaurantActionsForStatus(
     case 'ACCEPTED':
       return ['PREPARING'];
     case 'PREPARING':
+    case 'ASSIGNED':
+    case 'WAITING_FOR_DELIVERY_PARTNER':
+    case 'REACHED_RESTAURANT':
       return ['READY_FOR_PICKUP'];
     case 'READY_FOR_PICKUP':
       return ['PICKED_UP'];

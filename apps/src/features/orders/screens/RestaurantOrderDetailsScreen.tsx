@@ -206,7 +206,11 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
     );
   }
 
-  const actions = restaurantActionsForStatus(order?.status);
+  const hasBeenMarkedReady = order?.orderStatusEvents?.some((e: any) => e.toStatus === 'READY_FOR_PICKUP') ?? false;
+  let actions = restaurantActionsForStatus(order?.status);
+  if (['ASSIGNED', 'WAITING_FOR_DELIVERY_PARTNER', 'REACHED_RESTAURANT'].includes(order?.status ?? '') && hasBeenMarkedReady) {
+    actions = ['PICKED_UP'];
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: tokens.color.background }}>
