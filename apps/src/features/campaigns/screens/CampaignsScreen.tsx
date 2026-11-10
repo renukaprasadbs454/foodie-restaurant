@@ -289,6 +289,43 @@ export const CampaignsScreen = () => {
                       </Text>
                     </View>
                   </View>
+
+                  {/* Row 3: Admin % & Restaurant % Share */}
+                  <View style={styles.detailRow}>
+                    <View style={styles.detailColumn}>
+                      <Text style={styles.detailLabel}>Admin Share</Text>
+                      <Text style={[styles.detailValue, { color: '#2563EB', fontWeight: '700' }]}>
+                        {coupon.adminDiscount != null
+                          ? (coupon.discountType === 'PERCENT' ? `${coupon.adminDiscount}%` : `₹${coupon.adminDiscount}`)
+                          : (coupon.discountType === 'PERCENT' ? `${Math.round(coupon.value / 2)}%` : `₹${Math.round(coupon.value / 2)}`)}
+                      </Text>
+                      <Text style={styles.detailSubLabel}>Platform Absorbed</Text>
+                    </View>
+
+                    <View style={styles.detailColumn}>
+                      <Text style={styles.detailLabel}>Restaurant Share</Text>
+                      <Text style={[styles.detailValue, { color: '#D97706', fontWeight: '700' }]}>
+                        {coupon.restaurantDiscount != null
+                          ? (coupon.discountType === 'PERCENT' ? `${coupon.restaurantDiscount}%` : `₹${coupon.restaurantDiscount}`)
+                          : (coupon.discountType === 'PERCENT' ? `${Math.round(coupon.value - Math.round(coupon.value / 2))}%` : `₹${Math.round(coupon.value - Math.round(coupon.value / 2))}`)}
+                      </Text>
+                      <Text style={styles.detailSubLabel}>Co-Funded Deducted</Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Co-funded Promo Sharing Note */}
+                <View style={{
+                  backgroundColor: '#F0FDF4',
+                  borderColor: '#DCFCE7',
+                  borderWidth: 1,
+                  borderRadius: 8,
+                  padding: 8,
+                  marginBottom: 10,
+                }}>
+                  <Text style={{ fontSize: 11, color: '#166534', lineHeight: 15 }}>
+                    🤝 Zomato & Swiggy Model: Restaurant share ({coupon.restaurantDiscount != null ? `${coupon.restaurantDiscount}%` : `${Math.round(coupon.value / 2)}%`}) is deducted from order settlement only when customer orders with this coupon.
+                  </Text>
                 </View>
 
                 {/* Footer Controls */}

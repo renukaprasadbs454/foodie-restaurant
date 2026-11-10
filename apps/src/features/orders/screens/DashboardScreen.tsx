@@ -369,8 +369,6 @@ export function DashboardScreen({ navigation }: Props) {
                 style={{
                   padding: tokens.spacing.md,
                   borderRadius: 14,
-                  borderLeftWidth: 4,
-                  borderLeftColor: BRAND_ACCENT,
                   backgroundColor: '#FEF3C7',
                   gap: 4,
                 }}
@@ -400,8 +398,6 @@ export function DashboardScreen({ navigation }: Props) {
                 style={{
                   padding: tokens.spacing.md,
                   borderRadius: 14,
-                  borderLeftWidth: 4,
-                  borderLeftColor: BRAND_PRIMARY,
                   gap: 4,
                 }}
               >
@@ -428,8 +424,6 @@ export function DashboardScreen({ navigation }: Props) {
                 style={{
                   padding: tokens.spacing.md,
                   borderRadius: 14,
-                  borderLeftWidth: 4,
-                  borderLeftColor: BRAND_ACCENT,
                   gap: 4,
                 }}
               >
@@ -454,8 +448,6 @@ export function DashboardScreen({ navigation }: Props) {
                 style={{
                   padding: tokens.spacing.md,
                   borderRadius: 14,
-                  borderLeftWidth: 4,
-                  borderLeftColor: '#16A34A',
                   gap: 4,
                 }}
               >

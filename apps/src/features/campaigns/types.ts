@@ -32,6 +32,8 @@ export interface RestaurantCoupon {
   benefitMode?: string;
   zoneId?: string | null;
   zoneName?: string | null;
+  adminDiscount?: number | null;
+  restaurantDiscount?: number | null;
 }
 
 export interface GetRestaurantCouponsArgs {
@@ -333,6 +335,15 @@ export function normalizeCoupon(raw: any): RestaurantCoupon {
   const active = !expired && raw.isActive !== false && raw.status !== 'DEACTIVATED';
   const id = String(raw.couponId || raw.id || raw.code || '');
 
+  let adminDisc = raw.adminDiscount != null ? Number(raw.adminDiscount) : null;
+  let restDisc = raw.restaurantDiscount != null ? Number(raw.restaurantDiscount) : null;
+  if ((adminDisc == null || isNaN(adminDisc)) && (restDisc == null || isNaN(restDisc))) {
+    if (raw.funderType === 'SHARED') {
+      adminDisc = Math.round((val / 2) * 100) / 100;
+      restDisc = Math.round((val - adminDisc) * 100) / 100;
+    }
+  }
+
   return {
     couponId: id,
     code: String(raw.code || '').trim().toUpperCase(),
@@ -353,6 +364,8 @@ export function normalizeCoupon(raw: any): RestaurantCoupon {
     benefitMode: raw.benefitMode,
     zoneId: raw.zoneId || null,
     zoneName: raw.zoneName || null,
+    adminDiscount: adminDisc,
+    restaurantDiscount: restDisc,
   };
 }
 
