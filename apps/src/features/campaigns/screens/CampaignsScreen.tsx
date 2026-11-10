@@ -314,20 +314,6 @@ export const CampaignsScreen = () => {
                   </View>
                 </View>
 
-                {/* Co-funded Promo Sharing Note */}
-                <View style={{
-                  backgroundColor: '#F0FDF4',
-                  borderColor: '#DCFCE7',
-                  borderWidth: 1,
-                  borderRadius: 8,
-                  padding: 8,
-                  marginBottom: 10,
-                }}>
-                  <Text style={{ fontSize: 11, color: '#166534', lineHeight: 15 }}>
-                    🤝 Zomato & Swiggy Model: Restaurant share ({coupon.restaurantDiscount != null ? `${coupon.restaurantDiscount}%` : `${Math.round(coupon.value / 2)}%`}) is deducted from order settlement only when customer orders with this coupon.
-                  </Text>
-                </View>
-
                 {/* Footer Controls */}
                 <View style={styles.cardFooter}>
                   <View style={styles.adminTag}>

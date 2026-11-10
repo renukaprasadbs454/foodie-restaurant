@@ -51,9 +51,22 @@ export function useRestaurantOrdersSubscription(restaurantId: string | null) {
       (message: WebSocketMessage) => {
         if (
           message.type === 'NEW_ORDER_ALERT' ||
-          message.type === 'ORDER_STATUS_CHANGED'
+          message.type === 'ORDER_STATUS_CHANGED' ||
+          (message.type as string) === 'PAYMENT_CAPTURED'
         ) {
           dispatch(ordersApi.util.invalidateTags([{ type: 'Order', id: 'LIST' }]));
+        }
+        if (
+          ((message.type as string) === 'PAYMENT_CAPTURED' || (message as any).paymentStatus === 'PAID') &&
+          typeof message.orderId === 'string'
+        ) {
+          const orderId = message.orderId;
+          dispatch(
+            ordersApi.util.updateQueryData('getOrder', orderId, (draft) => {
+              (draft as any).paymentStatus = 'PAID';
+              (draft as any).paymentMethod = 'ONLINE';
+            }),
+          );
         }
         if (
           message.type === 'ORDER_STATUS_CHANGED' &&
