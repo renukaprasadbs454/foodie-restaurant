@@ -207,9 +207,19 @@ export function RestaurantOrderDetailsScreen({ route }: Props) {
   }
 
   const hasBeenMarkedReady = order?.orderStatusEvents?.some((e: any) => e.toStatus === 'READY_FOR_PICKUP') ?? false;
+  const stUpper = (order?.status || '').toUpperCase();
   let actions = restaurantActionsForStatus(order?.status);
-  if (['ASSIGNED', 'WAITING_FOR_DELIVERY_PARTNER', 'REACHED_RESTAURANT'].includes(order?.status ?? '') && hasBeenMarkedReady) {
+  if (['ASSIGNED', 'WAITING_FOR_DELIVERY_PARTNER', 'REACHED_RESTAURANT'].includes(stUpper) && hasBeenMarkedReady) {
     actions = ['PICKED_UP'];
+  }
+  if (['PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED', 'REJECTED', 'CANCELLED'].includes(stUpper)) {
+    actions = [];
+  } else if (actions.length === 0) {
+    if (stUpper === 'READY_FOR_PICKUP' || hasBeenMarkedReady) {
+      actions = ['PICKED_UP'];
+    } else {
+      actions = ['READY_FOR_PICKUP'];
+    }
   }
 
   return (

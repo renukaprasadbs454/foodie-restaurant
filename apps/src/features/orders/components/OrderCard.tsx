@@ -319,7 +319,7 @@ export function OrderCard({
           paddingTop: tokens.spacing.xs,
         }}
       >
-        {['CONFIRMED', 'PLACED', 'PENDING'].includes(status) ? (
+        {['PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED', 'REJECTED', 'CANCELLED'].includes((status || '').toUpperCase()) ? null : ['CONFIRMED', 'PLACED', 'PENDING'].includes((status || '').toUpperCase()) ? (
           <View style={{ flexDirection: 'column', gap: tokens.spacing.sm }}>
             <SwipeButton
               title="Accept Order"
@@ -332,12 +332,20 @@ export function OrderCard({
               onSwipeSuccess={() => onOpenRejectModal(order.orderId, order.orderNumber)}
             />
           </View>
-        ) : ['ACCEPTED', 'PREPARING'].includes(status) || (['ASSIGNED', 'WAITING_FOR_DELIVERY_PARTNER', 'REACHED_RESTAURANT'].includes(status) && !hasBeenMarkedReady && !locallyMarkedReady && status !== 'READY_FOR_PICKUP') ? (
+        ) : (status || '').toUpperCase() === 'READY_FOR_PICKUP' || locallyMarkedReady || hasBeenMarkedReady ? (
+          <View style={{ width: '100%', gap: tokens.spacing.sm }}>
+            <SwipeButton
+              title="Hand Over (Collected)"
+              backgroundColor={BRAND_PRIMARY}
+              onSwipeSuccess={() => onTransitionStatus(order.orderId, 'PICKED_UP')}
+            />
+          </View>
+        ) : (
           <View style={{ width: '100%', gap: tokens.spacing.sm }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#EFF6FF', paddingVertical: 8, borderRadius: 8, gap: 6 }}>
               <Text style={{ fontSize: 13 }}>🟢</Text>
               <Text style={{ color: '#2563EB', fontWeight: 'bold' }}>
-                {status === 'REACHED_RESTAURANT' ? 'Cooking in progress... (Delivery Partner Arrived)' : 'Cooking in progress...'}
+                {(status || '').toUpperCase() === 'REACHED_RESTAURANT' ? 'Cooking in progress... (Delivery Partner Arrived)' : 'Cooking in progress...'}
               </Text>
             </View>
             <SwipeButton
@@ -349,15 +357,7 @@ export function OrderCard({
               }}
             />
           </View>
-        ) : status === 'READY_FOR_PICKUP' || locallyMarkedReady || (['ASSIGNED', 'WAITING_FOR_DELIVERY_PARTNER', 'REACHED_RESTAURANT'].includes(status) && hasBeenMarkedReady) ? (
-          <View style={{ width: '100%', gap: tokens.spacing.sm }}>
-            <SwipeButton
-              title="Hand Over (Collected)"
-              backgroundColor={BRAND_PRIMARY}
-              onSwipeSuccess={() => onTransitionStatus(order.orderId, 'PICKED_UP')}
-            />
-          </View>
-        ) : null}
+        )}
       </View>
     </Card>
   );

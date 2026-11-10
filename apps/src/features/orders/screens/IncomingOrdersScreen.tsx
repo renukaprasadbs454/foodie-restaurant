@@ -177,6 +177,7 @@ export function IncomingOrdersScreen({ navigation }: Props) {
       else if (st === 'PREPARING') counts.PREPARING++;
       else if (st === 'READY_FOR_PICKUP' || st === 'WAITING_FOR_DELIVERY_PARTNER' || st === 'ASSIGNED') counts.READY_FOR_PICKUP++;
       else if (st === 'REACHED_RESTAURANT') {
+        counts.ACCEPTED++;
         counts.PREPARING++;
         counts.READY_FOR_PICKUP++;
       }
@@ -206,17 +207,19 @@ export function IncomingOrdersScreen({ navigation }: Props) {
 
     if (activeStatusFilter) {
       if (activeStatusFilter === 'CONFIRMED') {
-        result = result.filter((o) => ['CONFIRMED', 'PENDING'].includes(o.status));
+        result = result.filter((o) => ['CONFIRMED', 'PENDING'].includes((o.status || '').toUpperCase()));
+      } else if (activeStatusFilter === 'ACCEPTED') {
+        result = result.filter((o) => ['ACCEPTED', 'PREPARING', 'REACHED_RESTAURANT'].includes((o.status || '').toUpperCase()));
       } else if (activeStatusFilter === 'PREPARING') {
-        result = result.filter((o) => ['PREPARING', 'REACHED_RESTAURANT'].includes(o.status));
+        result = result.filter((o) => ['PREPARING', 'REACHED_RESTAURANT', 'ACCEPTED'].includes((o.status || '').toUpperCase()));
       } else if (activeStatusFilter === 'DELIVERED') {
-        result = result.filter((o) => ['DELIVERED', 'COMPLETED'].includes(o.status));
+        result = result.filter((o) => ['DELIVERED', 'COMPLETED'].includes((o.status || '').toUpperCase()));
       } else if (activeStatusFilter === 'REJECTED') {
-        result = result.filter((o) => ['REJECTED', 'CANCELLED'].includes(o.status));
+        result = result.filter((o) => ['REJECTED', 'CANCELLED'].includes((o.status || '').toUpperCase()));
       } else if (activeStatusFilter === 'READY_FOR_PICKUP') {
-        result = result.filter((o) => ['READY_FOR_PICKUP', 'WAITING_FOR_DELIVERY_PARTNER', 'ASSIGNED', 'REACHED_RESTAURANT'].includes(o.status));
+        result = result.filter((o) => ['READY_FOR_PICKUP', 'WAITING_FOR_DELIVERY_PARTNER', 'ASSIGNED', 'REACHED_RESTAURANT'].includes((o.status || '').toUpperCase()));
       } else {
-        result = result.filter((o) => o.status === activeStatusFilter);
+        result = result.filter((o) => (o.status || '').toUpperCase() === activeStatusFilter.toUpperCase());
       }
     }
 
