@@ -34,8 +34,12 @@ function AuthenticatedNavigator() {
     return <SplashScreen />;
   }
 
-  const hasApprovedRestaurant = myRestaurants?.some((r) => r.status === 'APPROVED');
-  const isApproved = data?.status === 'APPROVED' || Boolean(hasApprovedRestaurant);
+  const isMaintenance = Boolean(
+    data?.status === 'SUSPENDED' && data?.rejectionReason?.toLowerCase().includes('maintenance') ||
+    data?.rejectionReason?.toLowerCase().includes('maintenance')
+  );
+  const hasApprovedRestaurant = myRestaurants?.some((r) => r.status === 'APPROVED' && !r.rejectionReason?.toLowerCase().includes('maintenance'));
+  const isApproved = (data?.status === 'APPROVED' || Boolean(hasApprovedRestaurant)) && !isMaintenance;
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>

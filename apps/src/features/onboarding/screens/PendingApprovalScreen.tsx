@@ -60,6 +60,10 @@ export function PendingApprovalScreen({ navigation }: Props) {
 
   const status = query.data?.status ?? 'PENDING';
   const rejectionReason = query.data?.rejectionReason;
+  const isMaintenance = Boolean(
+    status === 'SUSPENDED' && (query.data?.rejectionReason?.toLowerCase().includes('maintenance') || query.data?.rejectionReason?.toLowerCase().includes('restaurant service')) ||
+    query.data?.rejectionReason?.toLowerCase().includes('maintenance')
+  );
   const loading = query.isLoading && !query.data;
 
   const handleResubmit = async () => {
@@ -94,14 +98,16 @@ export function PendingApprovalScreen({ navigation }: Props) {
             <View style={{ flex: 1, gap: 4 }}>
               <Text style={styles.headerBadge}>APPLICATION STATUS</Text>
               <Text style={styles.headerTitle}>
-                {status === 'REJECTED' ? 'Action Required' : status === 'APPROVED' ? 'Approved' : 'Approval Progress'}
+                {isMaintenance ? 'Service Maintenance' : status === 'REJECTED' ? 'Action Required' : status === 'APPROVED' ? 'Approved' : 'Approval Progress'}
               </Text>
               <Text style={styles.headerSubtitle}>
-                {status === 'REJECTED'
-                  ? 'Update your submission to proceed'
-                  : status === 'APPROVED'
-                    ? 'Your restaurant application has been approved'
-                    : 'Verification team is reviewing your documents'}
+                {isMaintenance
+                  ? 'Restaurant service is temporarily under maintenance for your zone'
+                  : status === 'REJECTED'
+                    ? 'Update your submission to proceed'
+                    : status === 'APPROVED'
+                      ? 'Your restaurant application has been approved'
+                      : 'Verification team is reviewing your documents'}
               </Text>
             </View>
             <View style={styles.iconCircle}>
@@ -177,7 +183,7 @@ export function PendingApprovalScreen({ navigation }: Props) {
               <View
                 style={[
                   styles.statusBadge,
-                  status === 'APPROVED' ? styles.badgeApproved : styles.badgePending,
+                  status === 'APPROVED' ? styles.badgeApproved : isMaintenance ? { backgroundColor: '#FEF3C7' } : styles.badgePending,
                 ]}
               >
                 <Text
@@ -185,10 +191,12 @@ export function PendingApprovalScreen({ navigation }: Props) {
                     styles.statusBadgeText,
                     status === 'APPROVED'
                       ? styles.badgeApprovedText
-                      : styles.badgePendingText,
+                      : isMaintenance
+                        ? { color: '#B45309' }
+                        : styles.badgePendingText,
                   ]}
                 >
-                  {status === 'APPROVED' ? '✓ APPROVED & LIVE' : '⏳ UNDER REVIEW'}
+                  {status === 'APPROVED' ? '✓ APPROVED & LIVE' : isMaintenance ? '🛠️ UNDER MAINTENANCE' : '⏳ UNDER REVIEW'}
                 </Text>
               </View>
             </View>
@@ -196,15 +204,19 @@ export function PendingApprovalScreen({ navigation }: Props) {
             <Text style={styles.cardTitle}>
               {status === 'APPROVED'
                 ? 'Welcome to Foodie Partner Network!'
-                : status === 'SUSPENDED'
-                  ? 'Account Suspended'
-                  : 'Verification In Progress'}
+                : isMaintenance
+                  ? 'Restaurant Service Under Maintenance'
+                  : status === 'SUSPENDED'
+                    ? 'Account Suspended'
+                    : 'Verification In Progress'}
             </Text>
 
             <Text style={styles.cardSub}>
               {status === 'APPROVED'
                 ? 'Your restaurant has been verified! Redirecting to your live order dashboard…'
-                : 'Our operations team is currently reviewing your restaurant profile, legal documents, and images. Approval takes up to 24 hours.'}
+                : isMaintenance
+                  ? 'Restaurant service is currently under maintenance for your zone. The administration will reactivate service shortly.'
+                  : 'Our operations team is currently reviewing your restaurant profile, legal documents, and images. Approval takes up to 24 hours.'}
             </Text>
 
             {status !== 'APPROVED' && Boolean((query.data as any)?.outOfZone || (query.data as any)?.nearestZoneDistanceKm) && (
