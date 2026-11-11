@@ -6,6 +6,10 @@ const sharedRnRoot = path.resolve(projectRoot, 'packages/shared-rn');
 
 const config = getDefaultConfig(projectRoot);
 
+if (config.server && 'tls' in config.server) {
+    delete config.server.tls;
+}
+
 config.watchFolders = [projectRoot];
 
 config.resolver.nodeModulesPaths = [
