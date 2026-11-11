@@ -1,15 +1,14 @@
 import React, { useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import * as SplashScreen from 'expo-splash-screen';
 import { useConnectivity } from 'foodie-shared-rn';
-import { useAppDispatch } from '../../store/hooks';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { setConnectivity } from '../../store/connectivitySlice';
+import { selectAuthStatus, setAuthStatus } from '../../features/auth/authSlice';
 import { runBootstrap } from './bootstrap';
-
-SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export function BootstrapGate({ children }: { children: ReactNode }) {
   const dispatch = useAppDispatch();
+  const authStatus = useAppSelector(selectAuthStatus);
   const [ready, setReady] = useState(false);
   const connectivity = useConnectivity();
 
@@ -30,11 +29,15 @@ export function BootstrapGate({ children }: { children: ReactNode }) {
     let mounted = true;
     void (async () => {
       try {
-        await runBootstrap(dispatch);
+        await Promise.race([
+          runBootstrap(dispatch),
+          new Promise((resolve) => setTimeout(resolve, 2500)),
+        ]);
+      } catch (err) {
+        console.warn('[BootstrapGate] Bootstrap error:', err);
       } finally {
         if (mounted) {
           setReady(true);
-          await SplashScreen.hideAsync().catch(() => {});
         }
       }
     })();
@@ -42,6 +45,12 @@ export function BootstrapGate({ children }: { children: ReactNode }) {
       mounted = false;
     };
   }, [dispatch]);
+
+  useEffect(() => {
+    if (ready && (authStatus === 'idle' || authStatus === 'authenticating')) {
+      dispatch(setAuthStatus('unauthenticated'));
+    }
+  }, [ready, authStatus, dispatch]);
 
   if (!ready) {
     return (

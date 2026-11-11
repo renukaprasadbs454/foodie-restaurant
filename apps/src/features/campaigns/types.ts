@@ -223,10 +223,7 @@ export function isAllLocationsCoupon(coupon: any): boolean {
   if (!coupon || typeof coupon !== 'object') return false;
   if (coupon.isAllZones === true) return true;
 
-  // Rule: Do not assume a missing zone ID means All Locations
-  if (!coupon.zoneId) return false;
-
-  const zId = String(coupon.zoneId).trim().toUpperCase();
+  const zId = coupon.zoneId ? String(coupon.zoneId).trim().toUpperCase() : '';
   if (
     zId === 'ALL' ||
     zId === 'ALL-LOCATIONS' ||
@@ -417,7 +414,7 @@ export function resolveRestaurantCouponActive(
     if (isExplicitlyDisabled) return false;
   }
 
-  // 4. Default: all newly received admin-created restaurant coupons must remain DISABLED by default
+  // 4. Default to DISABLED (false) for newly received admin-created coupons until enabled by the restaurant
   return false;
 }
 
@@ -497,20 +494,18 @@ export function filterCouponsForRestaurant(
         return true;
       }
 
-      // 6. Zone coupons and All Locations coupons require a verified restaurant zone
-      // Rule: Do not show coupons if the restaurant's zone cannot be verified
+      // If restaurant zone cannot be verified, return no coupons
       if (!cleanZone) {
         return false;
       }
 
-      // 7. All Locations coupons: visible to all eligible restaurants
-      if (isAllLocationsCoupon(c)) {
+      // 6. Zone coupons and All Locations coupons
+      // If coupon is All Locations, always visible to all eligible restaurants
+      if (isAllLocationsCoupon(c) || (c.zoneId && canonicalZoneId(c.zoneId) === 'ALL')) {
         return true;
       }
 
-      // 8. Zone-specific coupons:
-      // Rule: Do not assume a missing zone ID means All Locations
-      // Match against coupon's zoneId OR zoneName
+      // 7. Zone-specific coupons:
       const matchesZoneId = Boolean(c.zoneId && isZoneMatching(c.zoneId, cleanZone));
       const matchesZoneName = Boolean(c.zoneName && isZoneMatching(c.zoneName, cleanZone));
       return matchesZoneId || matchesZoneName;

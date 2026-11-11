@@ -37,6 +37,6 @@ export function shouldShowRegistrationGate(
 }
 
 export function shouldShowAuthNavigator(authStatus?: AuthStatus): boolean {
-  return authStatus === 'unauthenticated';
+  return authStatus === 'unauthenticated' || authStatus === 'idle';
 }
 

@@ -13,12 +13,12 @@ describe('restaurant order transitions (P2-RES-02)', () => {
     ]);
   });
 
-  it('advances ACCEPTED → PREPARING → READY_FOR_PICKUP', () => {
+  it('advances ACCEPTED → PREPARING → READY_FOR_PICKUP → PICKED_UP', () => {
     expect(restaurantActionsForStatus('ACCEPTED')).toEqual(['PREPARING']);
     expect(restaurantActionsForStatus('PREPARING')).toEqual([
       'READY_FOR_PICKUP',
     ]);
-    expect(restaurantActionsForStatus('READY_FOR_PICKUP')).toEqual([]);
+    expect(restaurantActionsForStatus('READY_FOR_PICKUP')).toEqual(['PICKED_UP']);
   });
 
   it('requires reject reason ≤500', () => {

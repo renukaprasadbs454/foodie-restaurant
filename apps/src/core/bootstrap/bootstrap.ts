@@ -20,7 +20,7 @@ import type { AppDispatch } from '../../store/store';
 
 /** TD-011: clear SecureStore + Redux + RTK on forced session end. */
 async function terminateSession(dispatch: AppDispatch): Promise<void> {
-  await clearRefreshToken();
+  await clearRefreshToken().catch(() => {});
   dispatch(clearCredentials());
   dispatch(baseApi.util.resetApiState());
 }
