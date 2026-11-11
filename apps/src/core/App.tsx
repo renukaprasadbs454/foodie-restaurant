@@ -11,6 +11,21 @@ import { PushRegistrationBridge } from './push/PushRegistrationBridge';
 import { NavigationProvider } from './providers/NavigationProvider';
 import { ReduxProvider } from './providers/ReduxProvider';
 import { ThemeProvider } from './providers/ThemeProvider';
+import { useAppStateChange } from 'foodie-shared-rn';
+import { useAppDispatch } from '../store/hooks';
+import { baseApi } from '../api/baseApi';
+
+function ForegroundSyncBridge() {
+  const dispatch = useAppDispatch();
+  useAppStateChange((next, previous) => {
+    if (previous?.match(/inactive|background/) && next === 'active') {
+      try {
+        dispatch(baseApi.util.invalidateTags(['Order', 'RestaurantMenu']));
+      } catch {}
+    }
+  });
+  return null;
+}
 
 type BoundaryState = { hasError: boolean; error?: Error };
 
@@ -61,6 +76,7 @@ export default function App() {
               <View style={styles.shell}>
                 <ConnectivityBanner />
                 <PushRegistrationBridge />
+                <ForegroundSyncBridge />
                 <View style={styles.content}>
                   <RootNavigator />
                 </View>

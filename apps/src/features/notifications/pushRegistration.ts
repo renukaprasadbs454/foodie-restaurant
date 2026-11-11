@@ -107,13 +107,22 @@ async function finalizeRegistration(
     lastUserId: userId,
   };
 
-  if (permissionStatus === 'granted') {
+  if (permissionStatus === 'granted' && !isWebRuntime()) {
     try {
-      next.deviceToken = extractDeviceToken(
-        await Notifications.getDevicePushTokenAsync(),
-      );
+      const projectId =
+        Constants?.expoConfig?.extra?.eas?.projectId ??
+        Constants?.easConfig?.projectId ??
+        'af06dc02-5eaf-4808-b684-3c53c7e30153';
+      const tokenObj = await Notifications.getExpoPushTokenAsync({ projectId });
+      next.deviceToken = tokenObj.data;
     } catch {
-      next.deviceToken = current.deviceToken;
+      try {
+        next.deviceToken = extractDeviceToken(
+          await Notifications.getDevicePushTokenAsync(),
+        );
+      } catch {
+        next.deviceToken = current.deviceToken;
+      }
     }
   }
 
