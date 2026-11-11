@@ -9,10 +9,13 @@ const GOOGLE_MAPS_API_KEY = 'AIzaSyBef3prJr9YvHFDYczEJ-mzZfSlLd2vHbE';
 if (Platform.OS === 'web') {
   // Fix for blank map on web using teovilla
   try {
-    const { default: WebMap } = require('@teovilla/react-native-web-maps');
-    WebMap.init({ apiKey: GOOGLE_MAPS_API_KEY });
-  } catch (e) {
-    console.error('Failed to init react-native-web-maps', e);
+    const webMaps = require('@teovilla/react-native-web-maps');
+    const WebMap = webMaps?.default || webMaps;
+    if (WebMap && typeof WebMap.init === 'function') {
+      WebMap.init({ apiKey: GOOGLE_MAPS_API_KEY });
+    }
+  } catch {
+    // ignore web map init if not supported
   }
 }
 

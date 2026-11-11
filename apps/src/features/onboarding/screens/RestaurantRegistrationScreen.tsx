@@ -40,10 +40,13 @@ import MapView, { Marker, Region, PROVIDER_GOOGLE } from 'react-native-maps';
 
 if (Platform.OS === 'web') {
   try {
-    const { default: WebMap } = require('@teovilla/react-native-web-maps');
-    WebMap.init({ apiKey: 'AIzaSyBef3prJr9YvHFDYczEJ-mzZfSlLd2vHbE' });
-  } catch (e) {
-    console.error('Failed to init react-native-web-maps', e);
+    const webMaps = require('@teovilla/react-native-web-maps');
+    const WebMap = webMaps?.default || webMaps;
+    if (WebMap && typeof WebMap.init === 'function') {
+      WebMap.init({ apiKey: 'AIzaSyBef3prJr9YvHFDYczEJ-mzZfSlLd2vHbE' });
+    }
+  } catch {
+    // ignore web map init if not supported
   }
 }
 

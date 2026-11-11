@@ -18,13 +18,6 @@ config.resolver.nodeModulesPaths = [
 
 config.resolver.disableHierarchicalLookup = false;
 
-config.resolver.extraNodeModules = {
-    react: path.resolve(projectRoot, 'node_modules/react'),
-    'react-dom': path.resolve(projectRoot, 'node_modules/react-dom'),
-    'react-native': path.resolve(projectRoot, 'node_modules/react-native'),
-    'react-redux': path.resolve(projectRoot, 'node_modules/react-redux'),
-};
-
 config.resolver.resolveRequest = (context, moduleName, platform) => {
     if (platform === 'web' && moduleName === 'react-native-maps') {
         return context.resolveRequest(context, '@teovilla/react-native-web-maps', platform);
@@ -35,6 +28,25 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
             type: 'sourceFile',
             filePath: path.resolve(sharedRnRoot, 'src/index.ts'),
         };
+    }
+
+    const dedupedPackages = [
+        'react',
+        'react-dom',
+        'react-native',
+        'react-redux',
+        '@react-navigation/native',
+        '@react-navigation/native-stack'
+    ];
+
+    for (const pkg of dedupedPackages) {
+        if (moduleName === pkg || moduleName.startsWith(pkg + '/')) {
+            return context.resolveRequest(
+                context,
+                moduleName.replace(pkg, path.resolve(projectRoot, 'node_modules', pkg)),
+                platform
+            );
+        }
     }
 
     return context.resolveRequest(context, moduleName, platform);
